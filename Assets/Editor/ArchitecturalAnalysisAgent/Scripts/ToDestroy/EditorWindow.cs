@@ -17,10 +17,10 @@ public class ArchitecturalAnalysisAgentWindow : EditorWindow
     
     private bool showSettings = true;
 
-    [MenuItem("FirUtils/Architectural Analysis Agent")]
+    [MenuItem("FirUtils/Architectural Analysis Agent 2")]
     public static void ShowWindow()
     {
-        GetWindow<ArchitecturalAnalysisAgentWindow>("Architectural Analysis Agent");
+        GetWindow<ArchitecturalAnalysisAgentWindow>("Architectural Analysis Agent 2");
     }
 
     private void OnGUI()
