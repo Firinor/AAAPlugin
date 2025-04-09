@@ -19,7 +19,6 @@ public class ScriptExplorer : EditorWindow
 
     private void OnEnable()
     {
-        // Создаем стиль для кнопок методов
         methodButtonStyle = new GUIStyle(EditorStyles.miniButton)
         {
             alignment = TextAnchor.MiddleLeft,

@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
+using UnityEditor.IMGUI.Controls;
 using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
 namespace FirUtility
@@ -22,8 +23,10 @@ namespace FirUtility
         
         //Right mode
         private string[] assemblyNames;
+        private bool assemblyGroup;
         private string selectedAssemblyString;
         private string[] scriptNames;
+        private bool scriptGroup;
         private string selectedScriptString;
         
         //NodeStyle
@@ -63,32 +66,25 @@ namespace FirUtility
         
         private void RefreshAssemblies()
         {
-            System.Reflection.Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             assemblyNames = assemblies.Select(a => a.GetName().Name).ToArray();
-
-            if (assemblyNames.Length > 0)
-            {
-                
-                //RefreshScriptsInAssembly(assemblyNames[selectedAssemblyIndex]);
-            }
         }
         
         private void OnGUI()
         {
             ResetStyle();
             
-            EditorGUILayout.Space();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
             DrawCodeSelectionSection();
-            EditorGUILayout.Space();
             DrawCodeMapSection();
-        
+            
             EditorGUILayout.EndScrollView();
         }
 
         private void DrawCodeSelectionSection()
         {
+            EditorGUILayout.Space();
             EditorGUILayout.BeginHorizontal();
             
             LeftCodeSelector();
@@ -98,49 +94,180 @@ namespace FirUtility
             EditorGUILayout.EndHorizontal();
         }
 
-        private void RightCodeSellector()
+        private void LeftCodeSelector()
         {
             EditorGUILayout.BeginVertical();
+            
             EditorGUILayout.BeginHorizontal();
-            Rect assemblyRect = EditorGUILayout.GetControlRect();
-            if (EditorGUI.DropdownButton(assemblyRect, new GUIContent($"Assembly: {selectedAssemblyString}"), FocusType.Keyboard))
+            AssemblyDefinitionAsset newAssembly = EditorGUILayout.ObjectField(
+                    "Select Assembly", selectedAssembly, typeof(AssemblyDefinitionAsset), false) 
+                as AssemblyDefinitionAsset;
+            if (newAssembly)
             {
-                GenericMenu assemblyMenu = new GenericMenu();
-                for (int i = 0; i < assemblyNames.Length; i++)
-                {
-                    int index = i;
-                    assemblyMenu.AddItem(new GUIContent(selectedAssemblyString), false, () => 
-                    {
-                        
-                    });
-                }
-                assemblyMenu.DropDown(assemblyRect);
+                selectedAssembly = newAssembly;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            
+            if (selectedAssembly is not null 
+                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
             {
-                //ShowScriptInfo();
+                ShowAssemblyInfo(selectedAssembly as AssemblyDefinitionAsset);
             }
             EditorGUILayout.EndHorizontal();
+            
             EditorGUILayout.BeginHorizontal();
-            Rect scriptRect = EditorGUILayout.GetControlRect();
-            if (EditorGUI.DropdownButton(scriptRect, new GUIContent($"Script: {selectedScriptString}"),
-                    FocusType.Keyboard))
+            MonoScript newScript = EditorGUILayout.ObjectField(
+                    "Select Script", selectedScript, typeof(MonoScript), targetBeingEdited: default) 
+                as MonoScript;
+            if (newScript)
             {
-                GenericMenu scriptMenu = new GenericMenu();
-                for (int i = 0; i < scriptNames.Length; i++)
-                {
-                    int index = i; // Локальная копия для замыкания
-                    scriptMenu.AddItem(new GUIContent(scriptNames[i]), false, () => { });
-                }
-
-                scriptMenu.DropDown(scriptRect);
+                selectedScript = newScript;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            if (selectedScript is not null 
+                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
             {
-                //ShowScriptInfo();
+                ShowScriptInfo(selectedScript.GetClass());
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
+        }
+
+        private void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
+        {
+            ShowAssemblyInfo(assemblyDefinitionAsset?.name);
+        }
+        private void ShowAssemblyInfo(string assemblyName)
+        {
+            Assembly assembly = null;
+            try
+            {
+                assembly = Assembly.Load(assemblyName ?? "");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+                
+            if (assembly is null)
+            {
+                EditorUtility.DisplayDialog("Error", "Null assembly during analysis", "ОК");
+            }
+            else
+            {
+                var analysisInfoWindow = CreateInstance<AssemblyAnalysisInfoWindow>();
+                analysisInfoWindow.SetAssembly(assembly);
+                analysisInfoWindow.titleContent = new GUIContent("Assembly: " + assembly.GetName().Name + " info");
+                analysisInfoWindow.Show();
+            }
+        }
+
+        private void ShowScriptInfo(string typeName)
+        {
+            if (String.IsNullOrEmpty(typeName))
+            {
+                EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
+                return;
+            }
+            
+            Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
+
+            if (assembly is null)
+            {
+                EditorUtility.DisplayDialog("Error", "Null assembly during analysis", "ОК");
+                return;
+            }
+            
+            Type type = assembly.GetTypes()
+                .FirstOrDefault(a => a.FullName == typeName);
+            
+            if (type is null)
+            {
+                EditorUtility.DisplayDialog("Error", "Null type during analysis", "ОК");
+                return;
+            }
+            
+            ShowScriptInfo(type);
+        }
+        private void ShowScriptInfo(Type type)
+        {
+            var analysisInfoWindow = CreateInstance<TypeAnalyzerWindow>();
+            analysisInfoWindow.SetType(type);
+            analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
+            analysisInfoWindow.Show();
+        }
+
+        private void RightCodeSellector()
+        {
+            EditorGUILayout.BeginVertical();
+            
+            EditorGUILayout.BeginHorizontal();
+            Rect assemblyRect = EditorGUILayout.GetControlRect();
+            if (EditorGUI.DropdownButton(assemblyRect, new GUIContent($"Assembly: {selectedAssemblyString}"), FocusType.Passive))
+            {
+                ShowAdvancedDropdown(assemblyRect, assemblyNames, assemblyGroup, (path) =>
+                {
+                    selectedAssemblyString = path;
+                    selectedScriptString = "";
+                    Repaint();
+                });
+            }
+
+            string folderSymbol = assemblyGroup ? "d_Folder Icon" : "d_TextAsset Icon";
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  buttonStyle))
+            {
+                assemblyGroup = !assemblyGroup;
+            }
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            {
+                ShowAssemblyInfo(selectedAssemblyString);
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.BeginHorizontal();
+            Rect scriptRect = EditorGUILayout.GetControlRect();
+            if (EditorGUI.DropdownButton(scriptRect, new GUIContent($"Script: {selectedScriptString}"), FocusType.Passive))
+            {
+                if (String.IsNullOrEmpty(selectedAssemblyString))
+                {
+                    EditorUtility.DisplayDialog("Error", "Select assembly first", "ОК");
+                    return;
+                }
+                
+                Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
+
+                Type[] types = assembly.GetTypes();
+                scriptNames = types.Select(t => t.FullName).ToArray();
+                
+                ShowAdvancedDropdown(scriptRect, scriptNames,  scriptGroup,(path) =>
+                {
+                    selectedScriptString = path; 
+                    Repaint();
+                });
+            }
+            folderSymbol = scriptGroup ? "d_Folder Icon" : "d_TextAsset Icon";
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  buttonStyle))
+            {
+                scriptGroup = !scriptGroup;
+            }
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            {
+                ShowScriptInfo(selectedScriptString);
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+        }
+
+        private void ShowAdvancedDropdown(Rect assemblyRect, string[] content, bool isNeedGroup, Action<string> onSelected)
+        {
+            var dropdown = new NestedSearchDropdown(
+                state: new AdvancedDropdownState(),
+                content: content,
+                isNeedGroup: isNeedGroup,
+                onItemSelected: onSelected
+            );
+
+            dropdown.Show(assemblyRect);
         }
 
         private void CodeSellectorToggle()
@@ -161,44 +288,11 @@ namespace FirUtility
             }
             EditorGUILayout.EndVertical();
         }
-
-        private void LeftCodeSelector()
-        {
-            EditorGUILayout.BeginVertical();
-            
-            EditorGUILayout.BeginHorizontal();
-            AssemblyDefinitionAsset newAssembly = EditorGUILayout.ObjectField(
-                    "Select Assembly", selectedAssembly, typeof(AssemblyDefinitionAsset), false) 
-                as AssemblyDefinitionAsset;
-            if (newAssembly)
-            {
-                selectedAssembly = newAssembly;
-            }
-            
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
-            {
-                //ShowAssemblyInfo();
-            }
-            EditorGUILayout.EndHorizontal();
-            
-            EditorGUILayout.BeginHorizontal();
-            MonoScript newScript = EditorGUILayout.ObjectField(
-                    "Select Script", selectedScript, typeof(MonoScript), false) 
-                as MonoScript;
-            if (newScript)
-            {
-                selectedScript = newScript;
-            }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
-            {
-                //ShowScriptInfo();
-            }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
-        }
-
+        
         private void DrawCodeMapSection()
         {
+            EditorGUILayout.Space();
+            
             float headerHeight = 50;
             Rect gridRect = new Rect(0, headerHeight, position.width, position.height - headerHeight);
             
@@ -218,7 +312,6 @@ namespace FirUtility
         
             if (GUI.changed) Repaint();
         }
-        
         private void DrawGrid(float gridSpacing, float gridOpacity, Color gridColor)
         {
             Vector2 offset = default;

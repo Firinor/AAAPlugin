@@ -1,8 +1,10 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using Object = UnityEngine.Object;
 
-public class MultiPanelWindow : EditorWindow
+public class MultiPanelWindow : EditorWindow, IDisposable, ILogHandler
 {
     private Dictionary<string, bool> expandedStates = new Dictionary<string, bool>();
     private Vector2 scrollPosition;
@@ -93,5 +95,19 @@ public class MultiPanelWindow : EditorWindow
         }
         
         EditorGUILayout.Space();
+    }
+
+    public void Dispose()
+    {
+        // TODO release managed resources here
+    }
+
+    public void LogFormat(LogType logType, Object context, string format, params object[] args)
+    { 
+    }
+
+    public void LogException(Exception exception, Object context)
+    {
+        
     }
 }
