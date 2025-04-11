@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using System;
+using UnityEditor;
 using UnityEngine;
 
 namespace FirUtility
@@ -51,6 +52,11 @@ namespace FirUtility
                 }
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        private void OnLostFocus()
+        {
+            Close();
         }
     }
 }

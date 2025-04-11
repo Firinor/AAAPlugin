@@ -29,10 +29,8 @@ namespace FirUtility
         private string[] scriptNames;
         private bool scriptGroup;
         private string selectedScriptString;
-        
-        //NodeMap
-        private float zoom = 1;
-        private Vector2 offset;
+
+        private NodeMapSettings map;
         
         //Nodes
         private List<Node> nodes = new List<Node>();
@@ -48,6 +46,7 @@ namespace FirUtility
 
         private void OnEnable()
         {
+            map = new NodeMapSettings(this);
             RefreshAssemblies();
         }
         
@@ -62,6 +61,10 @@ namespace FirUtility
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
             DrawCodeSelectionSection();
+            
+            map.Zoom = float.Parse(EditorGUILayout.TextField(map.Zoom.ToString()));
+            EditorGUILayout.TextField(map.Offset.ToString());
+            
             DrawCodeMapSection();
             
             EditorGUILayout.EndScrollView();
@@ -277,22 +280,21 @@ namespace FirUtility
 #endregion
 
 #region NodeSection
-
-private void OnEditNode(Node node)
-{
-    var editWindow = GetWindow<NodeEditingWindow>("Edit " + node.title);
-    editWindow.SetNode(node);
-    editWindow.Show();
-}
-private void OnRemoveNode(Node node)
-{
-    nodes.Remove(node);
-}
+        private void OnEditNode(Node node)
+        {
+            var editWindow = GetWindow<NodeEditingWindow>("Edit " + node.title);
+            editWindow.SetNode(node);
+            editWindow.Show();
+        }
+        private void OnRemoveNode(Node node)
+        {
+            nodes.Remove(node);
+        }
 
         private void RepaintWindow()
         {
-            zoom = 1;
-            offset = Vector2.zero;
+            map.Zoom = 1;
+            map.Offset = Vector2.zero;
             CleareAllNodes();
             
             Repaint();
@@ -331,45 +333,61 @@ private void OnRemoveNode(Node node)
         }
         private void DrawNodes()
         {
-            for (int i = 0; i < nodes.Count; i++)
+            foreach (var node in nodes)
             {
-                nodes[i].Draw();
+                node.Draw();
             }
         }
 
         private void DrawGrid()
         {
-            DrawGrid(20f / zoom, 0.2f, Color.gray);
-            DrawGrid(100f / zoom, 0.4f, Color.gray);
+            DrawGrid(20f / map.Zoom, 0.2f / map.Zoom, Color.gray);
+            DrawGrid(100f / map.Zoom, 0.6f / map.Zoom, Color.gray);
         }
 
         private void DrawGrid(float gridSpacing, float gridOpacity, Color gridColor)
         {
-         
-            Vector2 offset = default;
-            
             int widthDivs = Mathf.CeilToInt(position.width / gridSpacing);
-            int heightDivs = Mathf.CeilToInt(position.height * 0.9f / gridSpacing);
+            int heightDivs = Mathf.CeilToInt(position.height / gridSpacing);
         
             Handles.BeginGUI();
             Handles.color = new Color(gridColor.r, gridColor.g, gridColor.b, gridOpacity);
             
-            Vector3 newOffset = new Vector3(offset.x % gridSpacing, offset.y % gridSpacing, 0);
+            Vector2 newOffset = new Vector2(
+                map.Offset.x % gridSpacing, 
+                map.Offset.y % gridSpacing);
         
-            for (int i = 0; i < widthDivs; i++)
-            {
-                Handles.DrawLine(new Vector3(gridSpacing * i, -gridSpacing, 0) + newOffset,
-                    new Vector3(gridSpacing * i, position.height, 0f) + newOffset);
-            }
-        
-            for (int i = 0; i < heightDivs; i++)
-            {
-                Handles.DrawLine(new Vector3(-gridSpacing, gridSpacing * i, 0) + newOffset,
-                    new Vector3(position.width, gridSpacing * i, 0f) + newOffset);
-            }
+            Handles.DrawWireArc(
+                map.Offset,
+                Vector3.forward,     
+                Vector3.up,   
+                360f,          
+                20 / map.Zoom,
+                5
+            );
+            VerticalGrid();
+            HorizontalGrid();
         
             Handles.color = Color.white;
             Handles.EndGUI();
+
+            void VerticalGrid()
+            {
+                for (int i = 0; i <= widthDivs; i++)
+                {
+                    //to right
+                    Handles.DrawLine(new Vector3(newOffset.x + gridSpacing * i, 0, 0),
+                        new Vector3(newOffset.x + gridSpacing * i, position.height, 0));
+                }
+            }
+            void HorizontalGrid()
+            {
+                for (int i = 0; i <= heightDivs; i++)
+                {
+                    Handles.DrawLine(new Vector3(0, newOffset.y + gridSpacing * i, 0),
+                        new Vector3(position.width, newOffset.y + gridSpacing * i, 0));
+                }
+            }
         }
         
         private void ProcessNodeEvents(Event e)
@@ -407,24 +425,43 @@ private void OnRemoveNode(Node node)
                 case EventType.MouseDrag:
                     if (e.button == 0) // Левая кнопка мыши - перемещение
                     {
-                        //OnDrag(e.delta);
+                        OnDrag(e.delta);
                     }
 
                     break;
 
                 case EventType.ScrollWheel:
-                    //OnScroll(-e.delta.y);
+                    OnScroll(e);
                     e.Use();
                     break;
             }
         }
-        
+
+        private void OnDrag(Vector2 delta)
+        {
+            map.Offset += delta;
+            GUI.changed = true;
+        }
+
+        private void OnScroll(Event e)
+        {
+            Vector2 oldMousePos = (e.mousePosition - map.Offset) / map.Zoom;
+            
+            map.Zoom *= e.delta.y>0? 1.05f : .95f;
+            
+            Vector2 newMousePos = (e.mousePosition - map.Offset) / map.Zoom;
+            
+            map.Offset += oldMousePos - newMousePos;
+            
+            GUI.changed = true;
+        }
+
         private void ProcessContextMenu(Vector2 mousePosition)
         {
             GenericMenu genericMenu = new GenericMenu();
             genericMenu.AddItem(new GUIContent("Add node"), false, () =>
             {
-                nodes.Add(new Node("NewNode", mousePosition, OnEditNode, OnRemoveNode));
+                nodes.Add(new Node("NewNode", map, mousePosition, OnEditNode, OnRemoveNode));
             });
             genericMenu.ShowAsContext();
         }
