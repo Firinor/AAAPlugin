@@ -1,50 +1,63 @@
 ﻿using UnityEditor;
 using UnityEngine;
 
-public enum ConnectionPointType { In, Out }
-
-public class ConnectionPoint
+namespace TestToDestroy
 {
-    public Rect rect;
-    public ConnectionPointType type;
-    public Node node;
-    public GUIStyle style;
-    
-    public System.Action<ConnectionPoint> OnClickConnectionPoint;
-    
-    public ConnectionPoint(Node node, ConnectionPointType type, System.Action<ConnectionPoint> OnClickConnectionPoint)
+    public enum ConnectionPointType
     {
-        this.node = node;
-        this.type = type;
-        this.OnClickConnectionPoint = OnClickConnectionPoint;
-        rect = new Rect(0, 0, 10f, 20f);
-        
-        style = new GUIStyle();
-        style.normal.background = EditorGUIUtility.Load("builtin skins/darkskin/images/btn.png") as Texture2D;
-        style.active.background = EditorGUIUtility.Load("builtin skins/darkskin/images/btn on.png") as Texture2D;
+        In,
+        Out
     }
-    
-    public void Draw()
+
+    public class ConnectionPoint
     {
-        rect.y = node.rect.y + (node.rect.height * 0.5f) - rect.height * 0.5f;
-        
-        switch (type)
+        public Rect rect;
+        public ConnectionPointType type;
+        public Node node;
+        public GUIStyle style;
+
+        public System.Action<ConnectionPoint> OnClickConnectionPoint;
+
+        public ConnectionPoint(Node node, ConnectionPointType type,
+            System.Action<ConnectionPoint> OnClickConnectionPoint)
         {
-            case ConnectionPointType.In:
-                rect.x = node.rect.x - rect.width + 8f;
-                break;
-            
-            case ConnectionPointType.Out:
-                rect.x = node.rect.x + node.rect.width - 8f;
-                break;
+            this.node = node;
+            this.type = type;
+            this.OnClickConnectionPoint = OnClickConnectionPoint;
+            rect = new Rect(0, 0, 10f, 20f);
+
+            style = new GUIStyle();
+            style.normal.background = EditorGUIUtility.Load("builtin skins/darkskin/images/btn.png") as Texture2D;
+            style.active.background = EditorGUIUtility.Load("builtin skins/darkskin/images/btn on.png") as Texture2D;
         }
-        
-        if (GUI.Button(rect, "", style))
+
+        public void Draw()
         {
-            if (OnClickConnectionPoint != null)
+            rect.y = node.rect.y + (node.rect.height * 0.5f) - rect.height * 0.5f;
+
+            switch (type)
             {
-                OnClickConnectionPoint(this);
+                case ConnectionPointType.In:
+                    rect.x = node.rect.x - rect.width + 8f;
+                    break;
+
+                case ConnectionPointType.Out:
+                    rect.x = node.rect.x + node.rect.width - 8f;
+                    break;
+            }
+
+            if (GUI.Button(rect, "", style))
+            {
+                if (OnClickConnectionPoint != null)
+                {
+                    OnClickConnectionPoint(this);
+                }
             }
         }
+    }
+
+    public class Node
+    {
+        public Rect rect;
     }
 }

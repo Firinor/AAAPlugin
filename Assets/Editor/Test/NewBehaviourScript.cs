@@ -59,17 +59,58 @@ public enum J6
 
 public class H7
 {
-    protected virtual void Barrier(){}
+    public A1 pubA7;
+    private A1 priA7;
+    public A1 pubPropA7 { get; }
+    private A1 priPropA7 { get; }
+    protected A1 protec7;
+    protected A1 protecProp7 { get; }
+    protected virtual void BarrierH7(){}
 }
 
-public class K8 : H7
+public abstract class K8Child : H7
 {
-    protected override void Barrier()
+    public A1 pubA;
+    private A1 priA;
+    public A1 pubPropA { get; }
+    private A1 priPropA{ get;}
+    
+    public K8Child(){}
+    public K8Child(int a){}
+    protected K8Child(A1 a){}
+    private K8Child(string b) { }
+
+    protected void Barrier()
+    {
+        
+    }
+    protected static void BarrierStatic()
+    {
+        
+    }
+    protected virtual void BarrierVirtual()
+    {
+        
+    }
+
+    protected override void BarrierH7()
+    {
+    }
+
+    protected abstract void BarrierAbstract();
+}
+
+public interface L9{}
+
+internal abstract class M10 : L9
+{
+    public void M10m()
     {
         
     }
 }
 
-public interface L9{}
-
-public abstract class M10 : L9{}
+public struct K11struct
+{
+        
+}

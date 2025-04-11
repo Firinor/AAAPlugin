@@ -94,7 +94,7 @@ public class ScriptExplorer : EditorWindow
         {
             string accessModifier = method.IsPublic ? "<color=#569CD6>public</color>" : "<color=#9CDCFE>private</color>";
             string staticModifier = method.IsStatic ? " <color=#DCDCAA>static</color>" : "";
-            string returnType = $"<color=#4EC9B0>{method.ReturnType.Name}</color>";
+            string returnType = $"<color=#4EC9B1>{method.ReturnType.Name}</color>";
 
             // Параметры метода
             ParameterInfo[] parameters = method.GetParameters();

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
@@ -15,7 +16,7 @@ namespace FirUtility
         
         //Left mode
         private Object selectedAssembly;
-        private MonoScript selectedScript;
+        private MonoScript selectedMonoScript;
         private Type selectedType;
 
         //toggle
@@ -29,11 +30,15 @@ namespace FirUtility
         private bool scriptGroup;
         private string selectedScriptString;
         
-        //NodeStyle
-        private GUIStyle nodeStyle;
-        private GUIStyle selectedNodeStyle;
+        //NodeMap
+        private float zoom = 1;
+        private Vector2 offset;
         
-        private GUIStyle buttonStyle;
+        //Nodes
+        private List<Node> nodes = new List<Node>();
+        private Node selectedNode;
+        
+        //private List<Connection> connections = new List<Connection>();
         
         [MenuItem("FirUtility/Architectural Analysis Agent")]
         public static void ShowWindow()
@@ -45,24 +50,6 @@ namespace FirUtility
         {
             RefreshAssemblies();
         }
-
-        private void ResetStyle()
-        {
-            nodeStyle = new GUIStyle();
-            nodeStyle.normal.background = EditorGUIUtility.Load("builtin skins/darkskin/images/node1.png") as Texture2D;
-            nodeStyle.border = new RectOffset(12, 12, 12, 12);
-        
-            selectedNodeStyle = new GUIStyle();
-            selectedNodeStyle.normal.background = EditorGUIUtility.Load("builtin skins/darkskin/images/node1 on.png") as Texture2D;
-            selectedNodeStyle.border = new RectOffset(12, 12, 12, 12);
-
-            buttonStyle = new GUIStyle(GUI.skin.button);
-            buttonStyle.stretchHeight = true;
-            buttonStyle.padding = new RectOffset();
-            buttonStyle.alignment = TextAnchor.MiddleCenter;
-            buttonStyle.fixedWidth = 20;
-            buttonStyle.fixedHeight = 20;
-        }
         
         private void RefreshAssemblies()
         {
@@ -72,16 +59,14 @@ namespace FirUtility
         
         private void OnGUI()
         {
-            ResetStyle();
-            
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
             DrawCodeSelectionSection();
             DrawCodeMapSection();
             
             EditorGUILayout.EndScrollView();
-        }
-
+        } 
+#region CodeSelectionSection
         private void DrawCodeSelectionSection()
         {
             EditorGUILayout.Space();
@@ -108,7 +93,7 @@ namespace FirUtility
             }
             
             if (selectedAssembly is not null 
-                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
             {
                 ShowAssemblyInfo(selectedAssembly as AssemblyDefinitionAsset);
             }
@@ -116,16 +101,16 @@ namespace FirUtility
             
             EditorGUILayout.BeginHorizontal();
             MonoScript newScript = EditorGUILayout.ObjectField(
-                    "Select Script", selectedScript, typeof(MonoScript), targetBeingEdited: default) 
+                    "Select Script", selectedMonoScript, typeof(MonoScript), targetBeingEdited: default) 
                 as MonoScript;
             if (newScript)
             {
-                selectedScript = newScript;
+                selectedMonoScript = newScript;
             }
-            if (selectedScript is not null 
-                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            if (selectedMonoScript is not null 
+                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
             {
-                ShowScriptInfo(selectedScript.GetClass());
+                ShowScriptInfo(selectedMonoScript.GetClass());
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
@@ -191,7 +176,7 @@ namespace FirUtility
         private void ShowScriptInfo(Type type)
         {
             var analysisInfoWindow = CreateInstance<TypeAnalyzerWindow>();
-            analysisInfoWindow.SetType(type);
+            analysisInfoWindow.SetType(type, isRightMode? null:selectedMonoScript);
             analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
             analysisInfoWindow.Show();
         }
@@ -208,16 +193,16 @@ namespace FirUtility
                 {
                     selectedAssemblyString = path;
                     selectedScriptString = "";
-                    Repaint();
+                    RepaintWindow();
                 });
             }
 
             string folderSymbol = assemblyGroup ? "d_Folder Icon" : "d_TextAsset Icon";
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  buttonStyle))
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
             {
                 assemblyGroup = !assemblyGroup;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
                 ShowAssemblyInfo(selectedAssemblyString);
             }
@@ -242,15 +227,15 @@ namespace FirUtility
                 ShowAdvancedDropdown(scriptRect, scriptNames,  scriptGroup,(path) =>
                 {
                     selectedScriptString = path; 
-                    Repaint();
+                    RepaintWindow();
                 });
             }
             folderSymbol = scriptGroup ? "d_Folder Icon" : "d_TextAsset Icon";
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  buttonStyle))
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
             {
                 scriptGroup = !scriptGroup;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  buttonStyle))
+            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
                 ShowScriptInfo(selectedScriptString);
             }
@@ -285,35 +270,82 @@ namespace FirUtility
             if (GUILayout.Button(arrowSymbol, arrowStyle))
             {
                 isRightMode = !isRightMode;
+                RepaintWindow();
             }
             EditorGUILayout.EndVertical();
         }
-        
+#endregion
+
+#region NodeSection
+
+private void OnEditNode(Node node)
+{
+    var editWindow = GetWindow<NodeEditingWindow>("Edit " + node.title);
+    editWindow.SetNode(node);
+    editWindow.Show();
+}
+private void OnRemoveNode(Node node)
+{
+    nodes.Remove(node);
+}
+
+        private void RepaintWindow()
+        {
+            zoom = 1;
+            offset = Vector2.zero;
+            CleareAllNodes();
+            
+            Repaint();
+        }
+
+        private void CleareAllNodes()
+        {
+            foreach (var node in nodes)
+            {
+                node.Destroy();
+            }
+
+            selectedNode = null;
+            nodes = new List<Node>();
+        }
+
         private void DrawCodeMapSection()
         {
             EditorGUILayout.Space();
             
-            float headerHeight = 50;
+            float headerHeight = 55;
             Rect gridRect = new Rect(0, headerHeight, position.width, position.height - headerHeight);
             
             GUI.BeginClip(gridRect);
-            DrawGrid(20, 0.2f, Color.gray);
-            DrawGrid(100, 0.4f, Color.gray);
-        /*
-            DrawNodes();
-            DrawConnections();
-        
-            DrawConnectionLine(Event.current);
+            DrawGrid();
         
             ProcessNodeEvents(Event.current);
             ProcessEvents(Event.current);
-        */
+            
+            DrawNodes();
+            //DrawConnectionLine();
+            
             GUI.EndClip();
         
             if (GUI.changed) Repaint();
         }
+        private void DrawNodes()
+        {
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                nodes[i].Draw();
+            }
+        }
+
+        private void DrawGrid()
+        {
+            DrawGrid(20f / zoom, 0.2f, Color.gray);
+            DrawGrid(100f / zoom, 0.4f, Color.gray);
+        }
+
         private void DrawGrid(float gridSpacing, float gridOpacity, Color gridColor)
         {
+         
             Vector2 offset = default;
             
             int widthDivs = Mathf.CeilToInt(position.width / gridSpacing);
@@ -339,5 +371,73 @@ namespace FirUtility
             Handles.color = Color.white;
             Handles.EndGUI();
         }
+        
+        private void ProcessNodeEvents(Event e)
+        {
+            if (nodes is null) return;
+            
+            for (int i = nodes.Count - 1; i >= 0; i--)
+            {
+                bool guiChanged = nodes[i].ProcessEvents(e);
+
+                if (guiChanged)
+                {
+                    GUI.changed = true;
+                }
+            }
+        }
+        
+        private void ProcessEvents(Event e)
+        {
+            switch (e.type)
+            {
+                case EventType.MouseDown:
+                    if (e.button == 0)
+                    {
+                        ClearNodeSelection();
+                    }
+
+                    if (e.button == 1)
+                    {
+                        ProcessContextMenu(e.mousePosition);
+                    }
+
+                    break;
+
+                case EventType.MouseDrag:
+                    if (e.button == 0) // Левая кнопка мыши - перемещение
+                    {
+                        //OnDrag(e.delta);
+                    }
+
+                    break;
+
+                case EventType.ScrollWheel:
+                    //OnScroll(-e.delta.y);
+                    e.Use();
+                    break;
+            }
+        }
+        
+        private void ProcessContextMenu(Vector2 mousePosition)
+        {
+            GenericMenu genericMenu = new GenericMenu();
+            genericMenu.AddItem(new GUIContent("Add node"), false, () =>
+            {
+                nodes.Add(new Node("NewNode", mousePosition, OnEditNode, OnRemoveNode));
+            });
+            genericMenu.ShowAsContext();
+        }
+        
+        private void ClearNodeSelection()
+        {
+            if (nodes == null) return;
+            
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                nodes[i].isSelected = false;
+            }
+        }
+#endregion
     }
 }
