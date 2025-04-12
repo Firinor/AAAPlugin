@@ -341,8 +341,8 @@ namespace FirUtility
 
         private void DrawGrid()
         {
-            DrawGrid(20f / map.Zoom, 0.2f / map.Zoom, Color.gray);
-            DrawGrid(100f / map.Zoom, 0.6f / map.Zoom, Color.gray);
+            DrawGrid(20f * map.Zoom, 0.2f, Color.gray);
+            DrawGrid(100f * map.Zoom, 0.6f, Color.gray);
         }
 
         private void DrawGrid(float gridSpacing, float gridOpacity, Color gridColor)
@@ -351,24 +351,25 @@ namespace FirUtility
             int heightDivs = Mathf.CeilToInt(position.height / gridSpacing);
         
             Handles.BeginGUI();
-            Handles.color = new Color(gridColor.r, gridColor.g, gridColor.b, gridOpacity);
             
             Vector2 newOffset = new Vector2(
                 map.Offset.x % gridSpacing, 
                 map.Offset.y % gridSpacing);
         
+            Handles.color = Color.white;
             Handles.DrawWireArc(
                 map.Offset,
                 Vector3.forward,     
                 Vector3.up,   
                 360f,          
                 20 / map.Zoom,
-                5
+                3
             );
+            
+            Handles.color = new Color(gridColor.r, gridColor.g, gridColor.b, gridOpacity);
             VerticalGrid();
             HorizontalGrid();
-        
-            Handles.color = Color.white;
+            
             Handles.EndGUI();
 
             void VerticalGrid()
@@ -445,13 +446,22 @@ namespace FirUtility
 
         private void OnScroll(Event e)
         {
+            float oldZoom = map.Zoom;
+
+            Vector2 center = new Vector2(position.width / 2f, position.height / 2f);
             Vector2 oldMousePos = (e.mousePosition - map.Offset) / map.Zoom;
-            
-            map.Zoom *= e.delta.y>0? 1.05f : .95f;
+            Debug.Log("mouse: " + e.mousePosition + " mouseVector:" + (e.mousePosition - center));
+            Debug.Log("old: " + oldMousePos + " Zoom:" + map.Zoom);
+            map.Zoom *= e.delta.y < 0 ? 1.06382978f : 0.94f;
+            map.Zoom = Mathf.Clamp(map.Zoom, 0.1f, 4);
             
             Vector2 newMousePos = (e.mousePosition - map.Offset) / map.Zoom;
-            
-            map.Offset += oldMousePos - newMousePos;
+            Debug.Log("new: " + newMousePos + " Zoom:" + map.Zoom);
+
+            Vector2 delta = oldMousePos - newMousePos;
+            Debug.Log("delta: " + delta + " Zoom:" + (oldZoom - map.Zoom));
+            delta *= map.Zoom;
+            map.Offset -= delta;
             
             GUI.changed = true;
         }
@@ -462,6 +472,10 @@ namespace FirUtility
             genericMenu.AddItem(new GUIContent("Add node"), false, () =>
             {
                 nodes.Add(new Node("NewNode", map, mousePosition, OnEditNode, OnRemoveNode));
+            });
+            genericMenu.AddItem(new GUIContent("Position"), false, () =>
+            {
+                map.Offset = new Vector2(position.width/2f, position.height/2f);
             });
             genericMenu.ShowAsContext();
         }

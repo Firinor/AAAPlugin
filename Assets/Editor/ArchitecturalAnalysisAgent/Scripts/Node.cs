@@ -50,17 +50,13 @@ namespace FirUtility
             GUIStyle styleToUse = isSelected ? Style.SelectedNode(colorIndex) : Style.SimpleNode(colorIndex);
             Vector2 textSize = styleToUse.CalcSize(new GUIContent(title));
                
-            float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth) / map.Zoom;
-            float height = Style.MinButtonHeight / map.Zoom;
+            float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth) * map.Zoom;
+            float height = Style.MinButtonHeight * map.Zoom;
 
             float halfWidth = width / 2f;
             float halfHeight = height / 2f;
 
-            Vector2 mapOffset = map.Offset;//HalfSize
-            //Vector2 zoomOffset = mapOffset / map.Zoom;
-            Vector2 nodeOffset = position * map.Zoom;//10
-
-            Vector2 resultOffset = mapOffset + nodeOffset;
+            Vector2 resultOffset = (map.Offset + position);
             
             rect = new Rect(resultOffset.x - halfWidth, resultOffset.y - halfHeight, width, height);
             
