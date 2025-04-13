@@ -6,7 +6,6 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEditorInternal;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace FirUtility
 {
@@ -15,7 +14,7 @@ namespace FirUtility
         private Vector2 scrollPosition;
         
         //Left mode
-        private Object selectedAssembly;
+        private AssemblyDefinitionAsset selectedAssembly;
         private MonoScript selectedMonoScript;
         private Type selectedType;
 
@@ -83,13 +82,9 @@ namespace FirUtility
             EditorGUILayout.BeginVertical();
             
             EditorGUILayout.BeginHorizontal();
-            AssemblyDefinitionAsset newAssembly = EditorGUILayout.ObjectField(
+            selectedAssembly = EditorGUILayout.ObjectField(
                     "Select Assembly", selectedAssembly, typeof(AssemblyDefinitionAsset), false) 
                 as AssemblyDefinitionAsset;
-            if (newAssembly)
-            {
-                selectedAssembly = newAssembly;
-            }
             
             if (selectedAssembly is not null 
                 && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
@@ -162,59 +157,11 @@ namespace FirUtility
             }
         }
 
-        private void ShowScriptInfo(string typeName)
+        private void ShowScriptInfo(string typeName, string assemblyName = null)
         {
-            if (!GetTypeByName(typeName, out Type type)) return;
+            if (!Analyzer.GetTypeByName(out Type type, typeName, assemblyName)) return;
 
             ShowScriptInfo(type);
-        }
-
-        private bool GetTypeByName(string typeName, out Type type)
-        {
-            type = null;
-            
-            if (String.IsNullOrEmpty(typeName))
-            {
-                EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
-                return false;
-            }
-
-            Assembly assembly;
-            try
-            {
-                assembly = AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-                return false;
-            }
-            
-            if (assembly is null)
-            {
-                EditorUtility.DisplayDialog("Error", "Null assembly during analysis", "ОК");
-                return false;
-            }
-
-            try
-            {
-                type = assembly.GetTypes()
-                    .FirstOrDefault(a => a.FullName == typeName);
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-                return false;
-            }
-            
-            if (type is null)
-            {
-                EditorUtility.DisplayDialog("Error", "Null type during analysis", "ОК");
-                return false;
-            }
-
-            return true;
         }
 
         private void ShowScriptInfo(Type type)
@@ -281,11 +228,11 @@ namespace FirUtility
             }
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
-                ShowScriptInfo(selectedScriptString);
+                ShowScriptInfo(selectedScriptString, selectedAssemblyString);
             }
             if (GUILayout.Button("▼", Style.Button()))
             {
-                if(GetTypeByName(selectedScriptString, out Type type))
+                if(Analyzer.GetTypeByName(out Type type, selectedScriptString, selectedAssemblyString))
                     GenerateNodes(type);
             }
             EditorGUILayout.EndHorizontal();
@@ -515,6 +462,9 @@ namespace FirUtility
         
         private void GenerateNodes(Type type)
         {
+            int nodeStep = 50;
+            int nodeCount = 0;
+            
             ClearAllNodes();
             ToStartPoint();
             
@@ -526,15 +476,72 @@ namespace FirUtility
             
             void Center()
             {
-                nodes.Add(new Node(type.Name, map, Vector2.zero));
+                nodes.Add(new Node(type, map, Vector2.zero, Style.GetColorByType(type)));
             }
             void Up()
             {
+                Type parent = type.BaseType;
+                Type[] interfaces = type.GetInterfaces();
+
+                bool isInterfaces = interfaces is not null && interfaces.Length > 0;
                 
+                Vector2 offset = new(0, -nodeStep);
+                Vector2 classOffset = new(isInterfaces ? -nodeStep : 0, 0);
+                
+                int index = 1;
+                while (parent is not null)
+                {
+                    nodes.Add(new Node(parent.FullName, map, 
+                        classOffset + offset * index, NodeMapSettings.NodeColor.Teal));
+                    index++;
+                    parent = parent.BaseType;
+                }
+                if (!isInterfaces) return;
+                
+                Vector2 interfaceOffset = new(nodeStep, -nodeStep);
+                for(var i = 0; i < interfaces.Length; i++)
+                {
+                    nodes.Add(new Node(interfaces[i].FullName, map, 
+                        interfaceOffset +  offset * i, NodeMapSettings.NodeColor.Orange));
+                }
             }
             void Right()
             {
-                
+                HashSet<Type> usingTypes = new();
+                foreach (var info in type.GetFields(Analyzer.AllBindingFlags))
+                {
+                    usingTypes.UnionWith(Analyzer.GetAllGeneric(info.FieldType));
+                }
+                foreach (var info in type.GetProperties(Analyzer.AllBindingFlags))
+                {
+                    usingTypes.UnionWith(Analyzer.GetAllGeneric(info.PropertyType));
+                }
+                foreach (var constructor in type.GetConstructors(Analyzer.AllBindingFlags))
+                {
+                    foreach (var parameterInfo in constructor.GetParameters())
+                    {
+                        usingTypes.UnionWith(Analyzer.GetAllGeneric(parameterInfo.ParameterType));
+                    }
+                }
+                foreach (var method in type.GetMethods(Analyzer.AllBindingFlags))
+                {
+                    usingTypes.UnionWith(Analyzer.GetAllGeneric(method.ReturnType));
+                    
+                    foreach (var parameterInfo in method.GetParameters())
+                    {
+                        usingTypes.UnionWith(Analyzer.GetAllGeneric(parameterInfo.ParameterType));
+                    }
+                }
+
+                Analyzer.CleareCommonTypes(usingTypes);
+
+                nodeCount = usingTypes.Count;
+                int i = 0;
+                foreach (var type in usingTypes)
+                {
+                    nodes.Add(new Node(type, map, GetPosition(i), Style.GetColorByType(type)));
+                    i++;
+                }
             }
             void Down()
             {
@@ -544,7 +551,20 @@ namespace FirUtility
             {
                 
             }
+            
+            Vector2 GetPosition(int i)
+            {
+                int columnCap = Math.Min(10, nodeCount);
+                if (columnCap == 0) columnCap = 1;
+                
+                Vector2Int startPoint = new(nodeStep * 5, nodeStep * -(columnCap-1)/2);
+                Vector2Int columnOffset = new(nodeStep * 4, 0);
+                Vector2Int rowStep = new(0, nodeStep);
+
+                return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));
+            }
         }
-#endregion
+
+        #endregion
     }
 }

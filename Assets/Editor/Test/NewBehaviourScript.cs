@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using MyNamespace;
 using UnityEngine;
 /*
 public class NewBehaviourScript : MonoBehaviour
@@ -38,7 +39,10 @@ public class C3<T>
 {
     
 }
-
+public class C5<T, T2, T3> where T2 : class
+{
+    
+}
 public static class D4
 {
     
@@ -49,6 +53,12 @@ namespace MyNamespace
     public class E5
     {
         
+    }
+
+    public struct E6
+    {
+        public int i;
+        public double ad;
     }
 }
 
@@ -68,13 +78,18 @@ public class H7
     protected virtual void BarrierH7(){}
 }
 
-public abstract class K8Child : H7
+public abstract class K8Child : H7, L9
 {
     public A1 pubA;
     private A1 priA;
     public A1 pubPropA { get; }
     private A1 priPropA{ get;}
+
+    public E6 e6;
+
+    public C3<Color> c3;
     
+    public C5<Color, A1.B2, byte> c5;
     public K8Child(){}
     public K8Child(int a){}
     protected K8Child(A1 a){}

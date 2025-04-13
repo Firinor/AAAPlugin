@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -76,6 +77,22 @@ namespace FirUtility
                 fixedWidth = 20,
                 fixedHeight = 20
             };
+        }
+
+        public static NodeMapSettings.NodeColor GetColorByType(Type type)
+        {
+            if (type.IsEnum)
+                return NodeMapSettings.NodeColor.Yellow;
+            else if(type.IsValueType && !type.IsEnum)
+                return NodeMapSettings.NodeColor.Green;
+            else if (type.IsInterface)
+                return NodeMapSettings.NodeColor.Orange;
+            else if (typeof(Delegate).IsAssignableFrom(type))
+                return NodeMapSettings.NodeColor.Red;
+            else if (type.IsClass)
+                return NodeMapSettings.NodeColor.Blue;
+            
+            return NodeMapSettings.NodeColor.Grey;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using System;
+using UnityEditor;
 using UnityEngine;
 
 namespace FirUtility
@@ -6,17 +7,32 @@ namespace FirUtility
     public class Node
     {
         private Vector2 position;
-        public Rect rect;
+        private Rect rect;
+        public Type type;
         public string title;
         public int colorIndex = 1;
         
-        public bool isDragged;
+        private bool isDragged;
         private bool isSelected;
 
-        public System.Action<Node> OnEditNode;
-        public System.Action<Node> OnRemoveNode;
+        private Action<Node> OnEditNode;
+        private Action<Node> OnRemoveNode;
 
         private NodeMapSettings map;
+
+        public Node(Type type,
+            NodeMapSettings mapSettings,
+            Vector2 position,
+            NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Blue) 
+            
+            : this(type.FullName, mapSettings, position, color)
+        {
+            this.type = type;
+            if (type.IsGenericType)
+            {
+                title = type.Name;
+            }
+        }
         
         public Node(string title,
             NodeMapSettings mapSettings,
