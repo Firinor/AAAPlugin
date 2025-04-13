@@ -34,8 +34,6 @@ namespace FirUtility
         
         //Nodes
         private List<Node> nodes = new List<Node>();
-        private Node selectedNode;
-        
         //private List<Connection> connections = new List<Connection>();
         
         [MenuItem("FirUtility/Architectural Analysis Agent")]
@@ -47,6 +45,9 @@ namespace FirUtility
         private void OnEnable()
         {
             map = new NodeMapSettings(this);
+            map.OnEditNode = OnEditNode;
+            map.OnRemoveNode = OnRemoveNode;
+            
             RefreshAssemblies();
         }
         
@@ -61,10 +62,6 @@ namespace FirUtility
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
             DrawCodeSelectionSection();
-            
-            map.Zoom = float.Parse(EditorGUILayout.TextField(map.Zoom.ToString()));
-            EditorGUILayout.TextField(map.Offset.ToString());
-            
             DrawCodeMapSection();
             
             EditorGUILayout.EndScrollView();
@@ -76,7 +73,6 @@ namespace FirUtility
             EditorGUILayout.BeginHorizontal();
             
             LeftCodeSelector();
-            CodeSellectorToggle();
             RightCodeSellector();
             
             EditorGUILayout.EndHorizontal();
@@ -113,7 +109,25 @@ namespace FirUtility
             if (selectedMonoScript is not null 
                 && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
             {
-                ShowScriptInfo(selectedMonoScript.GetClass());
+                if (selectedMonoScript is not null)
+                {
+                    ShowScriptInfo(selectedMonoScript.GetClass());
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
+                }
+            }
+            if (GUILayout.Button("▼", Style.Button()))
+            {
+                if (selectedMonoScript is not null)
+                {
+                    GenerateNodes(selectedMonoScript.GetClass());
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
+                }
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
@@ -150,32 +164,59 @@ namespace FirUtility
 
         private void ShowScriptInfo(string typeName)
         {
+            if (!GetTypeByName(typeName, out Type type)) return;
+
+            ShowScriptInfo(type);
+        }
+
+        private bool GetTypeByName(string typeName, out Type type)
+        {
+            type = null;
+            
             if (String.IsNullOrEmpty(typeName))
             {
                 EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
-                return;
+                return false;
+            }
+
+            Assembly assembly;
+            try
+            {
+                assembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                return false;
             }
             
-            Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
-
             if (assembly is null)
             {
                 EditorUtility.DisplayDialog("Error", "Null assembly during analysis", "ОК");
-                return;
+                return false;
             }
-            
-            Type type = assembly.GetTypes()
-                .FirstOrDefault(a => a.FullName == typeName);
+
+            try
+            {
+                type = assembly.GetTypes()
+                    .FirstOrDefault(a => a.FullName == typeName);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                return false;
+            }
             
             if (type is null)
             {
                 EditorUtility.DisplayDialog("Error", "Null type during analysis", "ОК");
-                return;
+                return false;
             }
-            
-            ShowScriptInfo(type);
+
+            return true;
         }
+
         private void ShowScriptInfo(Type type)
         {
             var analysisInfoWindow = CreateInstance<TypeAnalyzerWindow>();
@@ -242,6 +283,11 @@ namespace FirUtility
             {
                 ShowScriptInfo(selectedScriptString);
             }
+            if (GUILayout.Button("▼", Style.Button()))
+            {
+                if(GetTypeByName(selectedScriptString, out Type type))
+                    GenerateNodes(type);
+            }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
@@ -256,26 +302,6 @@ namespace FirUtility
             );
 
             dropdown.Show(assemblyRect);
-        }
-
-        private void CodeSellectorToggle()
-        {
-            EditorGUILayout.BeginVertical(GUILayout.Width(0.1f));
-            GUIStyle arrowStyle = new GUIStyle(GUI.skin.button)
-            {
-                fontSize = 20,
-                alignment = TextAnchor.MiddleCenter,
-                fixedWidth = 30,
-                fixedHeight = 30
-            };
-
-            string arrowSymbol = isRightMode ? "▶" : "◀";
-            if (GUILayout.Button(arrowSymbol, arrowStyle))
-            {
-                isRightMode = !isRightMode;
-                RepaintWindow();
-            }
-            EditorGUILayout.EndVertical();
         }
 #endregion
 
@@ -294,20 +320,19 @@ namespace FirUtility
         private void RepaintWindow()
         {
             map.Zoom = 1;
-            map.Offset = Vector2.zero;
-            CleareAllNodes();
+            map.Offset = map.DefaultOffset;
+            ClearAllNodes();
             
             Repaint();
         }
 
-        private void CleareAllNodes()
+        private void ClearAllNodes()
         {
             foreach (var node in nodes)
             {
                 node.Destroy();
             }
-
-            selectedNode = null;
+            
             nodes = new List<Node>();
         }
 
@@ -362,7 +387,7 @@ namespace FirUtility
                 Vector3.forward,     
                 Vector3.up,   
                 360f,          
-                20 / map.Zoom,
+                20 * map.Zoom,
                 3
             );
             
@@ -385,6 +410,7 @@ namespace FirUtility
             {
                 for (int i = 0; i <= heightDivs; i++)
                 {
+                    //to down
                     Handles.DrawLine(new Vector3(0, newOffset.y + gridSpacing * i, 0),
                         new Vector3(position.width, newOffset.y + gridSpacing * i, 0));
                 }
@@ -413,7 +439,7 @@ namespace FirUtility
                 case EventType.MouseDown:
                     if (e.button == 0)
                     {
-                        ClearNodeSelection();
+                        //ClearNodeSelection();
                     }
 
                     if (e.button == 1)
@@ -446,20 +472,12 @@ namespace FirUtility
 
         private void OnScroll(Event e)
         {
-            float oldZoom = map.Zoom;
-
-            Vector2 center = new Vector2(position.width / 2f, position.height / 2f);
             Vector2 oldMousePos = (e.mousePosition - map.Offset) / map.Zoom;
-            Debug.Log("mouse: " + e.mousePosition + " mouseVector:" + (e.mousePosition - center));
-            Debug.Log("old: " + oldMousePos + " Zoom:" + map.Zoom);
             map.Zoom *= e.delta.y < 0 ? 1.06382978f : 0.94f;
             map.Zoom = Mathf.Clamp(map.Zoom, 0.1f, 4);
-            
             Vector2 newMousePos = (e.mousePosition - map.Offset) / map.Zoom;
-            Debug.Log("new: " + newMousePos + " Zoom:" + map.Zoom);
 
             Vector2 delta = oldMousePos - newMousePos;
-            Debug.Log("delta: " + delta + " Zoom:" + (oldZoom - map.Zoom));
             delta *= map.Zoom;
             map.Offset -= delta;
             
@@ -471,22 +489,60 @@ namespace FirUtility
             GenericMenu genericMenu = new GenericMenu();
             genericMenu.AddItem(new GUIContent("Add node"), false, () =>
             {
-                nodes.Add(new Node("NewNode", map, mousePosition, OnEditNode, OnRemoveNode));
+                nodes.Add(new Node("NewNode", map, (mousePosition - map.DefaultOffset) ));
             });
-            genericMenu.AddItem(new GUIContent("Position"), false, () =>
+            genericMenu.AddItem(new GUIContent("To start position"), false, () =>
             {
-                map.Offset = new Vector2(position.width/2f, position.height/2f);
+                ToStartPoint();
             });
             genericMenu.ShowAsContext();
         }
-        
+
+        private void ToStartPoint()
+        {
+            map.Offset = new Vector2(position.width/2f, position.height/2f);
+        }
+
         private void ClearNodeSelection()
         {
             if (nodes == null) return;
             
             for (int i = 0; i < nodes.Count; i++)
             {
-                nodes[i].isSelected = false;
+                nodes[i].Unselect();
+            }
+        }
+        
+        private void GenerateNodes(Type type)
+        {
+            ClearAllNodes();
+            ToStartPoint();
+            
+            Center();
+            Up();
+            Right();
+            Down();
+            Left();
+            
+            void Center()
+            {
+                nodes.Add(new Node(type.Name, map, Vector2.zero));
+            }
+            void Up()
+            {
+                
+            }
+            void Right()
+            {
+                
+            }
+            void Down()
+            {
+                
+            }
+            void Left()
+            {
+                
             }
         }
 #endregion

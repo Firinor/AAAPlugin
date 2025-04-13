@@ -10,8 +10,8 @@ namespace FirUtility
         private static List<GUIStyle> selectedStyle;  
         private static GUIStyle buttonStyle;  
         
-        public const int MinButtonWidth = 160;
-        public const int MinButtonHeight = 60;
+        public const int MinButtonWidth = 60;
+        public const int MinButtonHeight = 50;
         
         public static string PublicColor(string text = "public") => $"<color=#9CDCFE>{text}</color>";
         public static string PrivateColor(string text = "private") => $"<color=#569CD6>{text}</color>";

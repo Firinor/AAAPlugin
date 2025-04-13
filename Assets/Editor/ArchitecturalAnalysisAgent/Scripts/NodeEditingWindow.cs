@@ -7,8 +7,6 @@ namespace FirUtility
     public class NodeEditingWindow : EditorWindow
     {
         private Node _node;
-
-        private string name;
         private int colorIndex;
         
         public void SetNode(Node node)

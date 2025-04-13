@@ -8,55 +8,52 @@ namespace FirUtility
         private Vector2 position;
         public Rect rect;
         public string title;
-        public int colorIndex;
+        public int colorIndex = 1;
         
         public bool isDragged;
-        public bool isSelected;
+        private bool isSelected;
 
         public System.Action<Node> OnEditNode;
         public System.Action<Node> OnRemoveNode;
-
-        public GUIStyle simpleStyle;
-        public GUIStyle selectedStyle;
 
         private NodeMapSettings map;
         
         public Node(string title,
             NodeMapSettings mapSettings,
-            Vector2 position = default,
-            //System.Action<ConnectionPoint> OnClickInPoint = null, 
-            System.Action<Node> OnClickEditNode = null,
-            System.Action<Node> OnClickRemoveNode = null)
+            Vector2 position,
+            NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Blue)
         {
             this.title = title;
             map = mapSettings;
-            this.position = position - map.Offset;
+            this.position = position / map.Zoom;
             
-            OnEditNode = OnClickEditNode;
-            OnRemoveNode = OnClickRemoveNode;
+            OnEditNode = map.OnEditNode;
+            OnRemoveNode = map.OnRemoveNode;
 
-            colorIndex = 1;
-            simpleStyle = new GUIStyle(Style.SimpleNode());
-            selectedStyle = new GUIStyle(Style.SelectedNode());
+            colorIndex = (int)color;
         }
 
         private void Drag(Vector2 delta)
         {
-            rect.position += delta;
+            position += delta / map.Zoom;
         }
 
+        public void Unselect()
+        {
+            isSelected = false;
+        }
         public void Draw()
         {
             GUIStyle styleToUse = isSelected ? Style.SelectedNode(colorIndex) : Style.SimpleNode(colorIndex);
             Vector2 textSize = styleToUse.CalcSize(new GUIContent(title));
                
-            float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth) * map.Zoom;
-            float height = Style.MinButtonHeight * map.Zoom;
+            float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth) ;
+            float height =Mathf.Max(textSize.y * map.Zoom, Style.MinButtonHeight);
 
             float halfWidth = width / 2f;
             float halfHeight = height / 2f;
 
-            Vector2 resultOffset = (map.Offset + position);
+            Vector2 resultOffset = map.Offset + position * map.Zoom;
             
             rect = new Rect(resultOffset.x - halfWidth, resultOffset.y - halfHeight, width, height);
             
@@ -65,8 +62,6 @@ namespace FirUtility
 
         public bool ProcessEvents(Event e)
         {
-            //Vector2 point = e.mousePosition + new Vector2(0, -height);
-            
             switch (e.type)
             {
                 case EventType.MouseDown:
