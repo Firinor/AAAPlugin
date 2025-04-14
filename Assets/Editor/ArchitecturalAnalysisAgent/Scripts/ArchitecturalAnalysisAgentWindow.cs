@@ -33,7 +33,7 @@ namespace FirUtility
         
         //Nodes
         private List<Node> nodes = new List<Node>();
-        //private List<Connection> connections = new List<Connection>();
+        private Node newConnection;
         
         [MenuItem("FirUtility/Architectural Analysis Agent")]
         public static void ShowWindow()
@@ -46,6 +46,8 @@ namespace FirUtility
             map = new NodeMapSettings(this);
             map.OnEditNode = OnEditNode;
             map.OnRemoveNode = OnRemoveNode;
+            map.OnAnalysisNode = GenerateNodes;
+            map.OnAddConnection = AddConnection;
             
             RefreshAssemblies();
         }
@@ -89,7 +91,7 @@ namespace FirUtility
             if (selectedAssembly is not null 
                 && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
             {
-                ShowAssemblyInfo(selectedAssembly as AssemblyDefinitionAsset);
+                Analyzer.ShowAssemblyInfo(selectedAssembly);
             }
             EditorGUILayout.EndHorizontal();
             
@@ -106,7 +108,7 @@ namespace FirUtility
             {
                 if (selectedMonoScript is not null)
                 {
-                    ShowScriptInfo(selectedMonoScript.GetClass());
+                    Analyzer.ShowScriptInfo(selectedMonoScript.GetClass());
                 }
                 else
                 {
@@ -126,50 +128,6 @@ namespace FirUtility
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-        }
-
-        private void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
-        {
-            ShowAssemblyInfo(assemblyDefinitionAsset?.name);
-        }
-        private void ShowAssemblyInfo(string assemblyName)
-        {
-            Assembly assembly = null;
-            try
-            {
-                assembly = Assembly.Load(assemblyName ?? "");
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-            }
-                
-            if (assembly is null)
-            {
-                EditorUtility.DisplayDialog("Error", "Null assembly during analysis", "ОК");
-            }
-            else
-            {
-                var analysisInfoWindow = CreateInstance<AssemblyAnalysisInfoWindow>();
-                analysisInfoWindow.SetAssembly(assembly);
-                analysisInfoWindow.titleContent = new GUIContent("Assembly: " + assembly.GetName().Name + " info");
-                analysisInfoWindow.Show();
-            }
-        }
-
-        private void ShowScriptInfo(string typeName, string assemblyName = null)
-        {
-            if (!Analyzer.GetTypeByName(out Type type, typeName, assemblyName)) return;
-
-            ShowScriptInfo(type);
-        }
-
-        private void ShowScriptInfo(Type type)
-        {
-            var analysisInfoWindow = CreateInstance<TypeAnalyzerWindow>();
-            analysisInfoWindow.SetType(type, isRightMode? null:selectedMonoScript);
-            analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
-            analysisInfoWindow.Show();
         }
 
         private void RightCodeSellector()
@@ -195,7 +153,7 @@ namespace FirUtility
             }
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
-                ShowAssemblyInfo(selectedAssemblyString);
+                Analyzer.ShowAssemblyInfo(selectedAssemblyString);
             }
             EditorGUILayout.EndHorizontal();
             
@@ -228,7 +186,7 @@ namespace FirUtility
             }
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
-                ShowScriptInfo(selectedScriptString, selectedAssemblyString);
+                Analyzer.ShowScriptInfo(selectedScriptString, selectedAssemblyString);
             }
             if (GUILayout.Button("▼", Style.Button()))
             {
@@ -263,6 +221,11 @@ namespace FirUtility
         {
             nodes.Remove(node);
         }
+        
+        private void AddConnection(Node node)
+        {
+            newConnection = node;
+        }
 
         private void RepaintWindow()
         {
@@ -275,9 +238,9 @@ namespace FirUtility
 
         private void ClearAllNodes()
         {
-            foreach (var node in nodes)
+            for (int i = 0; i < nodes.Count; i++)
             {
-                node.Destroy();
+                nodes[i].Destroy();
             }
             
             nodes = new List<Node>();
@@ -296,18 +259,82 @@ namespace FirUtility
             ProcessNodeEvents(Event.current);
             ProcessEvents(Event.current);
             
+            DrawNodeConnections();
             DrawNodes();
-            //DrawConnectionLine();
+            DrawNewConnections(Event.current);
             
             GUI.EndClip();
         
             if (GUI.changed) Repaint();
         }
+        private void DrawNewConnections(Event e)
+        {
+            if(newConnection is null)
+                return;
+
+            Vector2 mousePosition = (e.mousePosition - map.Offset);
+            
+            float directionX = mousePosition.x - newConnection.position.x;
+            float directionY = mousePosition.y - newConnection.position.y;
+            bool isHorizontal = Mathf.Abs(directionX) > Mathf.Abs(directionY);
+            if (isHorizontal)
+            {
+                directionY = 0;
+                directionX = directionX > 0 ? 1 : -1;
+            }
+            else
+            {
+                directionX = 0;
+                directionY = directionY > 0 ? 1 : -1;
+            }
+
+            Vector2 direction = new Vector2(directionX, directionY);
+                
+            const float arrowSize = 10f;
+            
+            Vector2 arrowTip = map.Offset + mousePosition;
+
+            Vector2 arrowLeft = arrowTip - (Vector2)(Quaternion.Euler(0, 0, -30) * direction * arrowSize);
+            Vector2 arrowRight = arrowTip - (Vector2)(Quaternion.Euler(0, 0, 30) * direction * arrowSize);
+
+            Handles.DrawBezier(
+                map.Offset + newConnection.position * map.Zoom,
+                arrowTip,
+                map.Offset + newConnection.position * map.Zoom + direction * 50f,
+                arrowTip - direction * 50f,
+                Color.white,
+                null,
+                4f
+            );
+            Handles.DrawAAConvexPolygon(arrowTip, arrowLeft, arrowRight, arrowTip);
+            
+            GUI.changed = true;
+        }
+        private void DrawNodeConnections()
+        {
+            Handles.color = Color.white;
+            const int limit = 256;
+            if(nodes.Count > limit)
+                return;
+            
+            foreach (var node in nodes)
+            {
+                node.DrawConnections();
+            }
+        }
         private void DrawNodes()
         {
+            const int limit = 512;
+            int i = 0;
             foreach (var node in nodes)
             {
                 node.Draw();
+                i++;
+                if (i > limit)
+                {
+                    Debug.LogError($"The is more than {limit} nodes! Some nodes are not rendered!");
+                    break;
+                }
             }
         }
 
@@ -367,14 +394,34 @@ namespace FirUtility
         private void ProcessNodeEvents(Event e)
         {
             if (nodes is null) return;
-            
-            for (int i = nodes.Count - 1; i >= 0; i--)
-            {
-                bool guiChanged = nodes[i].ProcessEvents(e);
 
-                if (guiChanged)
+            if (newConnection is null)
+            {
+                for (int i = nodes.Count - 1; i >= 0; i--)
                 {
+                    bool guiChanged = nodes[i].ProcessEvents(e);
+
+                    if (guiChanged)
+                    {
+                        GUI.changed = true;
+                    }
+                }
+            }
+            else if(e.type == EventType.MouseDown && e.button == 0)
+            {
+                TryConnectToNode();
+                newConnection = null;
+            }
+
+            void TryConnectToNode()
+            {
+                for (int i = nodes.Count - 1; i >= 0; i--)
+                {
+                    if (!nodes[i].rect.Contains(e.mousePosition)) continue;
+                    
+                    newConnection.ConnectNode(nodes[i]);
                     GUI.changed = true;
+                    break;
                 }
             }
         }
@@ -391,7 +438,10 @@ namespace FirUtility
 
                     if (e.button == 1)
                     {
-                        ProcessContextMenu(e.mousePosition);
+                        if(newConnection is not null)
+                            newConnection = null;
+                        else
+                            ProcessContextMenu(e.mousePosition);
                     }
 
                     break;
@@ -462,6 +512,11 @@ namespace FirUtility
         
         private void GenerateNodes(Type type)
         {
+            if(type is null) return;
+            
+            Node lastCreatedNode;
+            Node centerNode;
+            
             int nodeStep = 50;
             int nodeCount = 0;
             
@@ -474,16 +529,19 @@ namespace FirUtility
             Down();
             Left();
             
-            void Center()
+            void Center()//Itself
             {
-                nodes.Add(new Node(type, map, Vector2.zero, Style.GetColorByType(type)));
+                centerNode = new Node(type, map, Vector2.zero, Style.GetColorByType(type));
+                nodes.Add(centerNode);
+                lastCreatedNode = centerNode;
             }
-            void Up()
+            void Up()//Parents
             {
                 Type parent = type.BaseType;
                 Type[] interfaces = type.GetInterfaces();
 
                 bool isInterfaces = interfaces is not null && interfaces.Length > 0;
+                bool isParents = parent is not null;
                 
                 Vector2 offset = new(0, -nodeStep);
                 Vector2 classOffset = new(isInterfaces ? -nodeStep : 0, 0);
@@ -491,21 +549,27 @@ namespace FirUtility
                 int index = 1;
                 while (parent is not null)
                 {
-                    nodes.Add(new Node(parent.FullName, map, 
-                        classOffset + offset * index, NodeMapSettings.NodeColor.Teal));
+                    Node newNode = new Node(parent, map,
+                        classOffset + offset * index, Style.GetColorByType(parent));
+                    newNode.ConnectNode(lastCreatedNode);
+                    nodes.Add(newNode);
+
+                    lastCreatedNode = newNode;
                     index++;
                     parent = parent.BaseType;
                 }
                 if (!isInterfaces) return;
                 
-                Vector2 interfaceOffset = new(nodeStep, -nodeStep);
+                Vector2 interfaceOffset = new(isParents ? nodeStep : 0, -nodeStep);
                 for(var i = 0; i < interfaces.Length; i++)
                 {
-                    nodes.Add(new Node(interfaces[i].FullName, map, 
-                        interfaceOffset +  offset * i, NodeMapSettings.NodeColor.Orange));
+                    Node newNode = new Node(interfaces[i], map,
+                        interfaceOffset + offset * i, Style.GetColorByType(interfaces[i]));
+                    newNode.ConnectNode(centerNode);
+                    nodes.Add(newNode);
                 }
             }
-            void Right()
+            void Right()//References
             {
                 HashSet<Type> usingTypes = new();
                 foreach (var info in type.GetFields(Analyzer.AllBindingFlags))
@@ -539,26 +603,54 @@ namespace FirUtility
                 int i = 0;
                 foreach (var type in usingTypes)
                 {
-                    nodes.Add(new Node(type, map, GetPosition(i), Style.GetColorByType(type)));
+                    Node newNode = new Node(type, map, GetPosition(i, isRightSide: true), Style.GetColorByType(type));
+                    centerNode.ConnectNode(newNode);
+                    nodes.Add(newNode);
                     i++;
                 }
             }
-            void Down()
+            void Down()//Inheritors
             {
+                var inheritors = Analyzer.GetAllInheritorOfType(type);
+                if(inheritors is null) return;
                 
+                Vector2 offset = new(0, nodeStep);
+                int i = 1;
+                foreach (Type inheritor in inheritors)
+                {
+                    Node newNode = new Node(inheritor, map,
+                        offset * i, Style.GetColorByType(inheritor));
+                    if(inheritor.BaseType == centerNode.type)
+                        centerNode.ConnectNode(newNode);
+                    
+                    nodes.Add(newNode);
+                    i++;
+                }
             }
-            void Left()
+            void Left()//Users
             {
+                HashSet<Type> usersType = Analyzer.GetAllUsagersOfType(type);
                 
+                Analyzer.CleareCommonTypes(usersType);
+
+                nodeCount = usersType.Count;
+                int i = 0;
+                foreach (var type in usersType)
+                {
+                    Node newNode = new Node(type, map, GetPosition(i, isRightSide: false), Style.GetColorByType(type));
+                    newNode.ConnectNode(centerNode);
+                    nodes.Add(newNode);
+                    i++;
+                }
             }
             
-            Vector2 GetPosition(int i)
+            Vector2 GetPosition(int i, bool isRightSide)
             {
                 int columnCap = Math.Min(10, nodeCount);
                 if (columnCap == 0) columnCap = 1;
                 
-                Vector2Int startPoint = new(nodeStep * 5, nodeStep * -(columnCap-1)/2);
-                Vector2Int columnOffset = new(nodeStep * 4, 0);
+                Vector2Int startPoint = new((isRightSide? 1 : -1) * nodeStep * 5, nodeStep * -(columnCap-1)/2);
+                Vector2Int columnOffset = new((isRightSide? 1 : -1) * nodeStep * 4, 0);
                 Vector2Int rowStep = new(0, nodeStep);
 
                 return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));

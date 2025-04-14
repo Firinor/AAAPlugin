@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using Object = System.Object;
 
@@ -174,5 +176,184 @@ namespace FirUtility
         
         public static BindingFlags AllBindingFlags =>
             BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic;
+
+        public static HashSet<Type> GetAllInheritorOfType(Type type)
+        {
+            if (type is null)
+                return null;
+            
+            if (type.IsSealed)
+                return null;
+
+            HashSet<Type> types = new();
+
+            if (type.IsInterface)
+            {
+                foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    types.UnionWith(assemblyObject.GetTypes()
+                        .Where(a => 
+                            a.GetInterfaces().Contains(type))
+                        .ToArray());
+                }
+            }
+            else
+            {
+                foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    types.UnionWith(assemblyObject.GetTypes()
+                        .Where(type.IsAssignableFrom
+                        /*{
+                            if() return true;
+                            Type parent = a.BaseType;
+                            while (parent != null)
+                            {
+                                if (parent == type) return true;
+                                parent = parent.BaseType;
+                            }
+
+                            return false;
+                        }*/
+                        )
+                        .ToArray());
+                }
+            }
+            types.Remove(type);
+            return types;
+        }
+        
+        public static HashSet<Type> GetAllUsagersOfType(Type type)
+        {
+            if (type is null)
+                return null;
+
+            HashSet<Type> types = new();
+            
+            foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if(assemblyObject.FullName.StartsWith("System")
+                    || assemblyObject.FullName.StartsWith("UnityEngine")
+                    || assemblyObject.FullName.StartsWith("UnityEditor"))
+                    continue;
+                
+                foreach (var assemblyType in assemblyObject.GetTypes())
+                {
+                    if(assemblyType.FullName.StartsWith("System")
+                       || assemblyType.FullName.StartsWith("UnityEngine")
+                       || assemblyType.FullName.StartsWith("UnityEditor"))
+                        continue;
+
+                    if (FindInType(assemblyType))
+                    {
+                        types.Add(assemblyType);
+                    };
+                }
+            }
+
+            types.Remove(type);
+            
+            return types;
+            
+            bool FindInType(Type assemblyType)
+            {
+                foreach (var info in assemblyType.GetFields(AllBindingFlags))
+                {
+                    foreach (var foundedType in GetAllGeneric(info.FieldType))
+                    {
+                        if (type.IsAssignableFrom(foundedType))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                foreach (var info in assemblyType.GetProperties(AllBindingFlags))
+                {
+                    foreach (var foundedType in GetAllGeneric(info.PropertyType))
+                    {
+                        if (type.IsAssignableFrom(foundedType))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                foreach (var constructor in assemblyType.GetConstructors(AllBindingFlags))
+                {
+                    foreach (var parameterInfo in constructor.GetParameters())
+                    {
+                        foreach (var foundedType in GetAllGeneric(parameterInfo.ParameterType))
+                        {
+                            if (type.IsAssignableFrom(foundedType))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                foreach (var method in assemblyType.GetMethods(AllBindingFlags))
+                {
+                    foreach (var foundedType in GetAllGeneric(method.ReturnType))
+                    {
+                        if (type.IsAssignableFrom(foundedType))
+                        {
+                            return true;
+                        }
+                    }
+                    
+                    foreach (var parameterInfo in method.GetParameters())
+                    {
+                        foreach (var foundedType in GetAllGeneric(parameterInfo.ParameterType))
+                        {
+                            if (type.IsAssignableFrom(foundedType))
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                return false;
+            }
+        }
+        public static void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
+        {
+            ShowAssemblyInfo(assemblyDefinitionAsset?.name);
+        }
+        public static void ShowAssemblyInfo(string assemblyName)
+        {
+            Assembly assembly = null;
+            try
+            {
+                assembly = Assembly.Load(assemblyName ?? "");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+                
+            if (assembly is null)
+            {
+                Debug.LogError("Null assembly during analysis");
+            }
+            else
+            {
+                var analysisInfoWindow = EditorWindow.CreateInstance<AssemblyAnalysisInfoWindow>();
+                analysisInfoWindow.SetAssembly(assembly);
+                analysisInfoWindow.titleContent = new GUIContent("Assembly: " + assembly.GetName().Name + " info");
+                analysisInfoWindow.Show();
+            }
+        }
+        public static void ShowScriptInfo(string typeName, string assemblyName = null)
+        {
+            if (!GetTypeByName(out Type type, typeName, assemblyName)) return;
+
+            ShowScriptInfo(type);
+        }
+        public static void ShowScriptInfo(Type type)
+        {
+            TypeAnalyzerWindow analysisInfoWindow = EditorWindow.CreateInstance<TypeAnalyzerWindow>();
+            analysisInfoWindow.SetType(type);
+            analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
+            analysisInfoWindow.Show();
+        }
     }
 }

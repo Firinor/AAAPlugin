@@ -13,7 +13,7 @@ namespace FirUtility
         private Vector2 scrollPosition;
         private Type selectedType;
         private MonoScript selectedMonoScript;
-        private GUIStyle lineStyle;
+        //private GUIStyle lineStyle;
         private GUIStyle headerButtonStyle;
 
         private string inheritanceInfo;
@@ -29,16 +29,16 @@ namespace FirUtility
             BuildInheritanceInfo(selectedType);
         }
         
-        private void OnEnable()
+        private void CheckStyle()
         {
-            lineStyle = new GUIStyle(EditorStyles.miniButton)
+            /*lineStyle = new GUIStyle(EditorStyles.miniButton)
             {
                 alignment = TextAnchor.MiddleLeft,
                 padding = new RectOffset(10, 5, 3, 3),
                 margin = new RectOffset(0, 0, 2, 2),
                 fixedHeight = 20,
                 richText = true
-            };
+            };*/
             
             headerButtonStyle = new GUIStyle(GUI.skin.button)
             {
@@ -54,6 +54,8 @@ namespace FirUtility
         {
             if (selectedType is null)
                 return;
+
+            CheckStyle();
             
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 

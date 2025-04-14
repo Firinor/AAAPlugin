@@ -18,7 +18,9 @@ namespace FirUtility
         public Vector2 Offset;
         private EditorWindow window;
 
+        public Action<Type> OnAnalysisNode;
         public Action<Node> OnEditNode;
+        public Action<Node> OnAddConnection;
         public Action<Node> OnRemoveNode;
 
         public enum NodeColor

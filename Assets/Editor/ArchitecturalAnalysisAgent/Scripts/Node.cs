@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -6,8 +7,8 @@ namespace FirUtility
 {
     public class Node
     {
-        private Vector2 position;
-        private Rect rect;
+        public Vector2 position;
+        public Rect rect;
         public Type type;
         public string title;
         public int colorIndex = 1;
@@ -15,9 +16,10 @@ namespace FirUtility
         private bool isDragged;
         private bool isSelected;
 
-        private Action<Node> OnEditNode;
-        private Action<Node> OnRemoveNode;
+        private HashSet<Node> connections = new();
 
+        private Action<Node> OnRemoveNode;
+        
         private NodeMapSettings map;
 
         public Node(Type type,
@@ -43,7 +45,6 @@ namespace FirUtility
             map = mapSettings;
             this.position = position / map.Zoom;
             
-            OnEditNode = map.OnEditNode;
             OnRemoveNode = map.OnRemoveNode;
 
             colorIndex = (int)color;
@@ -76,6 +77,58 @@ namespace FirUtility
             GUI.Box(rect, title, styleToUse);
         }
 
+        public void ConnectNode(Node target)
+        {
+            connections.Add(target);
+            target.OnRemoveNode += DisconnectNode;
+        }
+
+        private void DisconnectNode(Node other)
+        {
+            connections.Remove(other);
+        }
+
+        public void DrawConnections()
+        {
+            foreach (var connection in connections)
+            {
+                float directionX = connection.position.x - position.x;
+                float directionY = connection.position.y - position.y;
+                bool isHorizontal = Mathf.Abs(directionX) > Mathf.Abs(directionY);
+                if (isHorizontal)
+                {
+                    directionY = 0;
+                    directionX = directionX > 0 ? 1 : -1;
+                }
+                else
+                {
+                    directionX = 0;
+                    directionY = directionY > 0 ? 1 : -1;
+                }
+
+                Vector2 direction = new Vector2(directionX, directionY);
+                
+                const float arrowSize = 10f;
+
+                Vector2 nodeRectSize = new Vector2(connection.rect.width-arrowSize, connection.rect.height-arrowSize)/2f;
+                Vector2 arrowTip = map.Offset + connection.position * map.Zoom - nodeRectSize * direction;
+
+                Vector2 arrowLeft = arrowTip - (Vector2)(Quaternion.Euler(0, 0, -30) * direction * arrowSize);
+                Vector2 arrowRight = arrowTip - (Vector2)(Quaternion.Euler(0, 0, 30) * direction * arrowSize);
+
+                Handles.DrawBezier(
+                    map.Offset + position * map.Zoom,
+                    arrowTip,
+                    map.Offset + position * map.Zoom + direction * 50f,
+                    arrowTip - direction * 50f,
+                    Color.white,
+                    null,
+                    4f
+                );
+                Handles.DrawAAConvexPolygon(arrowTip, arrowLeft, arrowRight, arrowTip);
+            }
+        }
+        
         public bool ProcessEvents(Event e)
         {
             switch (e.type)
@@ -127,22 +180,24 @@ namespace FirUtility
         private void ProcessContextMenu()
         {
             GenericMenu genericMenu = new GenericMenu();
-            genericMenu.AddItem(new GUIContent("Change node"), false, () => OnEditNode?.Invoke(this));
-            genericMenu.AddItem(new GUIContent("Remove node"), false, OnClickRemoveNode);
+            
+            genericMenu.AddItem(new GUIContent("Open the information window"), false,
+                () => Analyzer.ShowScriptInfo(type));
+            genericMenu.AddItem(new GUIContent("Architectural analysis"), false, 
+                () => map.OnAnalysisNode?.Invoke(type));
+            genericMenu.AddItem(new GUIContent("Add connection"), false, 
+                () => map.OnAddConnection?.Invoke(this));
+            genericMenu.AddItem(new GUIContent("Change node"), false, 
+                () => map.OnEditNode?.Invoke(this));
+            genericMenu.AddItem(new GUIContent("Remove node"), false, 
+                () => OnRemoveNode?.Invoke(this));
+            
             genericMenu.ShowAsContext();
-        }
-        
-        private void OnClickRemoveNode()
-        {
-            if (OnRemoveNode != null)
-            {
-                OnRemoveNode(this);
-            }
         }
 
         public void Destroy()
         {
-            //ConnectionPoint
+            OnRemoveNode?.Invoke(this);
         }
     }
 }

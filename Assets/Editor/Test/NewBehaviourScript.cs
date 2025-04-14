@@ -31,7 +31,7 @@ public class A1
     
     private class B3
     {
-        
+        private K8Child d;
     }
 }
 
@@ -45,14 +45,14 @@ public class C5<T, T2, T3> where T2 : class
 }
 public static class D4
 {
-    
+    private static K8Child f;
 }
 
 namespace MyNamespace
 {
     public class E5
     {
-        
+        private K8Child f;
     }
 
     public struct E6
@@ -78,7 +78,30 @@ public class H7
     protected virtual void BarrierH7(){}
 }
 
-public abstract class K8Child : H7, L9
+public class K9 : K8Child
+{
+    protected override void BarrierAbstract()
+    {
+        throw new System.NotImplementedException();
+    }
+}
+
+public class K10 : K8Child
+{
+    protected override void BarrierAbstract()
+    {
+        throw new System.NotImplementedException();
+    }
+}
+public class K11 : K10
+{
+    protected override void BarrierAbstract()
+    {
+        throw new System.NotImplementedException();
+    }
+}
+
+public abstract class K8Child : H7, L9interface
 {
     public A1 pubA;
     private A1 priA;
@@ -115,9 +138,9 @@ public abstract class K8Child : H7, L9
     protected abstract void BarrierAbstract();
 }
 
-public interface L9{}
-
-internal abstract class M10 : L9
+public interface L9interface{}
+public interface L10interface : L9interface{}
+internal abstract class M10 : L9interface
 {
     public void M10m()
     {
