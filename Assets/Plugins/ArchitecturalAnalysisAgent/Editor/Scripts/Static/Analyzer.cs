@@ -151,7 +151,7 @@ namespace FirUtility
             }
         }
 
-        public static void CleareCommonTypes(HashSet<Type> usingTypes)
+        public static void ClearCommonTypes(HashSet<Type> usingTypes)
         {
             usingTypes.Remove(typeof(void));
             usingTypes.Remove(typeof(string));
@@ -332,7 +332,7 @@ namespace FirUtility
                 
             if (assembly is null)
             {
-                Debug.LogError("Null assembly during analysis");
+                Debug.LogError("Assembly analysis failed!");
             }
             else
             {

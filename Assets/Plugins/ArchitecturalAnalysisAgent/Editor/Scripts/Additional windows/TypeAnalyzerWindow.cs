@@ -13,52 +13,53 @@ namespace FirUtility
         private Vector2 scrollPosition;
         private Type selectedType;
         private MonoScript selectedMonoScript;
-        //private GUIStyle lineStyle;
-        private GUIStyle headerButtonStyle;
 
         private string inheritanceInfo;
         
         private bool groupInfo;
         private bool privateInfo = true;
 
-        public void SetType(Type type, MonoScript mono = null)
+        public void SetType(MonoScript mono)
         {
-            selectedType = type;
             selectedMonoScript = mono;
+            selectedType = mono.GetType();
             
             BuildInheritanceInfo(selectedType);
         }
         
-        private void CheckStyle()
+        public void SetType(Type type)
         {
-            /*lineStyle = new GUIStyle(EditorStyles.miniButton)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                padding = new RectOffset(10, 5, 3, 3),
-                margin = new RectOffset(0, 0, 2, 2),
-                fixedHeight = 20,
-                richText = true
-            };*/
+            selectedType = type;
             
-            headerButtonStyle = new GUIStyle(GUI.skin.button)
-            {
-                stretchHeight = true,
-                padding = new RectOffset(),
-                alignment = TextAnchor.MiddleCenter,
-                fixedWidth = 20,
-                fixedHeight = 20
-            };
+            BuildInheritanceInfo(selectedType);
         }
-
+        private void HandleKeyboardEvents()
+        {
+            Event currentEvent = Event.current;
+            
+            //Ctrl+C (Command+C on Mac)
+            if (currentEvent.type == EventType.KeyDown 
+                && currentEvent.keyCode == KeyCode.C 
+                && (currentEvent.control || currentEvent.command))
+            {
+                CopyClassNameToClipboard();
+                currentEvent.Use(); // Marking the event as processed
+            }
+        }
+        private void CopyClassNameToClipboard()
+        {
+            GUIUtility.systemCopyBuffer = selectedType.Name;
+            ShowNotification(new GUIContent($"Copied: {GUIUtility.systemCopyBuffer}"));
+            Focus();
+        }
         private void OnGUI()
         {
             if (selectedType is null)
                 return;
-
-            CheckStyle();
             
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
 
+            HandleKeyboardEvents();
             HeaderSettings();
 
             BindingFlags flags = GetFlags();
@@ -87,16 +88,20 @@ namespace FirUtility
                 }
             
                 string folderSymbol = groupInfo ? "d_Folder Icon" : "d_TextAsset Icon";
-                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  headerButtonStyle))
+                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
                 {
                     groupInfo = !groupInfo;
                     Repaint();
                 }
                 folderSymbol = privateInfo ? "d_VisibilityOn" : "d_VisibilityOff";
-                if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image),  headerButtonStyle))
+                if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
                 {
                     privateInfo = !privateInfo;
                     Repaint();
+                }
+                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("TreeEditor.Duplicate").image), Style.Button()))
+                {
+                    CopyClassNameToClipboard();
                 }
                 EditorGUILayout.EndHorizontal();
             }

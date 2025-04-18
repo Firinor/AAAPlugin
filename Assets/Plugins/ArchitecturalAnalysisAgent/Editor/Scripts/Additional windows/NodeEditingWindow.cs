@@ -23,10 +23,10 @@ namespace FirUtility
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Name:");
-            string newTitle = EditorGUILayout.TextField(_node.title);
-            if (newTitle != _node.title)
+            string newTitle = EditorGUILayout.TextField(_node.name);
+            if (newTitle != _node.name)
             {
-                _node.title = newTitle;
+                _node.name = newTitle;
                 GUI.changed = true;
             }
 
@@ -37,11 +37,11 @@ namespace FirUtility
             {
                 int index = i; //hash
                 GUIStyle styleToUse = index == colorIndex ? Style.SelectedNode(index) : Style.SimpleNode(index);
-                Vector2 textSize = styleToUse.CalcSize(new GUIContent(_node.title));
+                Vector2 textSize = styleToUse.CalcSize(new GUIContent(_node.name));
                
                 float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth);
                 
-                if (GUILayout.Button(_node.title, 
+                if (GUILayout.Button(_node.name, 
                         styleToUse, 
                         new []{GUILayout.Width(width), GUILayout.Height(60)}))
                 {

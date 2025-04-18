@@ -17,9 +17,6 @@ namespace FirUtility
         private AssemblyDefinitionAsset selectedAssembly;
         private MonoScript selectedMonoScript;
         private Type selectedType;
-
-        //toggle
-        private bool isRightMode;
         
         //Right mode
         private string[] assemblyNames;
@@ -48,6 +45,7 @@ namespace FirUtility
             map.OnRemoveNode = OnRemoveNode;
             map.OnAnalysisNode = GenerateNodes;
             map.OnAddConnection = AddConnection;
+            map.OnCopyNode = CopyClassNameToClipboard;
             
             RefreshAssemblies();
         }
@@ -62,11 +60,37 @@ namespace FirUtility
         {
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             
+            HandleKeyboardEvents();
+            
             DrawCodeSelectionSection();
             DrawCodeMapSection();
             
             EditorGUILayout.EndScrollView();
         } 
+        
+        private void HandleKeyboardEvents()
+        {
+            if (focusedWindow == this && !String.IsNullOrEmpty(selectedScriptString))
+            {
+                Event currentEvent = Event.current;
+            
+                //Ctrl+C (Command+C on Mac)
+                if (currentEvent.type == EventType.KeyDown 
+                    && currentEvent.keyCode == KeyCode.C 
+                    && (currentEvent.control || currentEvent.command))
+                {
+                    CopyClassNameToClipboard(selectedScriptString.Split(".").Last());
+                    currentEvent.Use(); // Marking the event as processed
+                }
+            }
+        }
+        
+        private void CopyClassNameToClipboard(string data)
+        {
+            GUIUtility.systemCopyBuffer = data;
+            ShowNotification(new GUIContent($"Copied: {GUIUtility.systemCopyBuffer}"));
+            Focus();
+        }
 #region CodeSelectionSection
         private void DrawCodeSelectionSection()
         {
@@ -74,7 +98,7 @@ namespace FirUtility
             EditorGUILayout.BeginHorizontal();
             
             LeftCodeSelector();
-            RightCodeSellector();
+            RightCodeSelector();
             
             EditorGUILayout.EndHorizontal();
         }
@@ -96,45 +120,33 @@ namespace FirUtility
             EditorGUILayout.EndHorizontal();
             
             EditorGUILayout.BeginHorizontal();
-            MonoScript newScript = EditorGUILayout.ObjectField(
+            selectedMonoScript = EditorGUILayout.ObjectField(
                     "Select Script", selectedMonoScript, typeof(MonoScript), targetBeingEdited: default) 
                 as MonoScript;
-            if (newScript)
+            if (selectedMonoScript is not null)
             {
-                selectedMonoScript = newScript;
-            }
-            if (selectedMonoScript is not null 
-                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
-            {
-                if (selectedMonoScript is not null)
+                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),
+                        Style.Button()))
                 {
                     Analyzer.ShowScriptInfo(selectedMonoScript.GetClass());
                 }
-                else
-                {
-                    EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
-                }
-            }
-            if (GUILayout.Button("▼", Style.Button()))
-            {
-                if (selectedMonoScript is not null)
+
+                if (GUILayout.Button("▼", Style.Button()))
                 {
                     GenerateNodes(selectedMonoScript.GetClass());
                 }
-                else
-                {
-                    EditorUtility.DisplayDialog("Error", "Empty script during analysis", "ОК");
-                }
             }
+
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
 
-        private void RightCodeSellector()
+        private void RightCodeSelector()
         {
             EditorGUILayout.BeginVertical();
             
             EditorGUILayout.BeginHorizontal();
+            
             Rect assemblyRect = EditorGUILayout.GetControlRect();
             if (EditorGUI.DropdownButton(assemblyRect, new GUIContent($"Assembly: {selectedAssemblyString}"), FocusType.Passive))
             {
@@ -151,7 +163,8 @@ namespace FirUtility
             {
                 assemblyGroup = !assemblyGroup;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
+            if (!String.IsNullOrEmpty(selectedAssemblyString) &&
+                GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
             {
                 Analyzer.ShowAssemblyInfo(selectedAssemblyString);
             }
@@ -184,15 +197,22 @@ namespace FirUtility
             {
                 scriptGroup = !scriptGroup;
             }
-            if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
+
+            if (!String.IsNullOrEmpty(selectedScriptString))
             {
-                Analyzer.ShowScriptInfo(selectedScriptString, selectedAssemblyString);
+                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),
+                        Style.Button()))
+                {
+                    Analyzer.ShowScriptInfo(selectedScriptString, selectedAssemblyString);
+                }
+
+                if (GUILayout.Button("▼", Style.Button()))
+                {
+                    if (Analyzer.GetTypeByName(out Type type, selectedScriptString, selectedAssemblyString))
+                        GenerateNodes(type);
+                }
             }
-            if (GUILayout.Button("▼", Style.Button()))
-            {
-                if(Analyzer.GetTypeByName(out Type type, selectedScriptString, selectedAssemblyString))
-                    GenerateNodes(type);
-            }
+
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
@@ -213,7 +233,7 @@ namespace FirUtility
 #region NodeSection
         private void OnEditNode(Node node)
         {
-            var editWindow = GetWindow<NodeEditingWindow>("Edit " + node.title);
+            var editWindow = GetWindow<NodeEditingWindow>("Edit " + node.name);
             editWindow.SetNode(node);
             editWindow.Show();
         }
@@ -597,7 +617,7 @@ namespace FirUtility
                     }
                 }
 
-                Analyzer.CleareCommonTypes(usingTypes);
+                Analyzer.ClearCommonTypes(usingTypes);
 
                 nodeCount = usingTypes.Count;
                 int i = 0;
@@ -631,7 +651,7 @@ namespace FirUtility
             {
                 HashSet<Type> usersType = Analyzer.GetAllUsagersOfType(type);
                 
-                Analyzer.CleareCommonTypes(usersType);
+                Analyzer.ClearCommonTypes(usersType);
 
                 nodeCount = usersType.Count;
                 int i = 0;

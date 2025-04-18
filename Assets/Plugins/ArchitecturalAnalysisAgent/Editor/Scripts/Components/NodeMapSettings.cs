@@ -20,6 +20,7 @@ namespace FirUtility
 
         public Action<Type> OnAnalysisNode;
         public Action<Node> OnEditNode;
+        public Action<string> OnCopyNode;
         public Action<Node> OnAddConnection;
         public Action<Node> OnRemoveNode;
 

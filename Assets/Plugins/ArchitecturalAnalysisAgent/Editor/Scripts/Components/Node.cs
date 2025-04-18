@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,7 +11,7 @@ namespace FirUtility
         public Vector2 position;
         public Rect rect;
         public Type type;
-        public string title;
+        public string name;
         public int colorIndex = 1;
         
         private bool isDragged;
@@ -32,16 +33,16 @@ namespace FirUtility
             this.type = type;
             if (type.IsGenericType)
             {
-                title = type.Name;
+                name = type.Name;
             }
         }
         
-        public Node(string title,
+        public Node(string name,
             NodeMapSettings mapSettings,
             Vector2 position,
             NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Blue)
         {
-            this.title = title;
+            this.name = name;
             map = mapSettings;
             this.position = position / map.Zoom;
             
@@ -62,7 +63,7 @@ namespace FirUtility
         public void Draw()
         {
             GUIStyle styleToUse = isSelected ? Style.SelectedNode(colorIndex) : Style.SimpleNode(colorIndex);
-            Vector2 textSize = styleToUse.CalcSize(new GUIContent(title));
+            Vector2 textSize = styleToUse.CalcSize(new GUIContent(name));
                
             float width = Mathf.Max(textSize.x + 40, Style.MinButtonWidth) ;
             float height =Mathf.Max(textSize.y * map.Zoom, Style.MinButtonHeight);
@@ -74,7 +75,7 @@ namespace FirUtility
             
             rect = new Rect(resultOffset.x - halfWidth, resultOffset.y - halfHeight, width, height);
             
-            GUI.Box(rect, title, styleToUse);
+            GUI.Box(rect, name, styleToUse);
         }
 
         public void ConnectNode(Node target)
@@ -187,6 +188,8 @@ namespace FirUtility
                 () => map.OnAnalysisNode?.Invoke(type));
             genericMenu.AddItem(new GUIContent("Add connection"), false, 
                 () => map.OnAddConnection?.Invoke(this));
+            genericMenu.AddItem(new GUIContent("Copy name"), false, 
+                () => map.OnCopyNode?.Invoke(name.Split(".").Last()));
             genericMenu.AddItem(new GUIContent("Change node"), false, 
                 () => map.OnEditNode?.Invoke(this));
             genericMenu.AddItem(new GUIContent("Remove node"), false, 
