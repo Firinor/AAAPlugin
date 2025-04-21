@@ -128,12 +128,13 @@ namespace FirUtility
                 if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),
                         Style.Button()))
                 {
-                    Analyzer.ShowScriptInfo(selectedMonoScript.GetClass());
+                    
+                    Analyzer.ShowScriptInfo(selectedMonoScript);
                 }
 
                 if (GUILayout.Button("▼", Style.Button()))
                 {
-                    GenerateNodes(selectedMonoScript.GetClass());
+                    GenerateNodes(selectedMonoScript);
                 }
             }
 
@@ -184,7 +185,7 @@ namespace FirUtility
                     .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
 
                 Type[] types = assembly.GetTypes();
-                scriptNames = types.Select(t => t.FullName).ToArray();
+                scriptNames = types.Select(t => t.ToString()).ToArray();
                 
                 ShowAdvancedDropdown(scriptRect, scriptNames,  scriptGroup,(path) =>
                 {
@@ -529,7 +530,18 @@ namespace FirUtility
                 nodes[i].Unselect();
             }
         }
-        
+
+        private void GenerateNodes(MonoScript monoScript)
+        {
+            Type type = monoScript.GetClass();
+            if (monoScript.GetClass() is null)
+            {
+                Debug.LogError("Couldn't detect type inside the file " + monoScript.name + "!");
+                return;
+            }
+            GenerateNodes(type);
+        }
+
         private void GenerateNodes(Type type)
         {
             if(type is null) return;
@@ -592,37 +604,52 @@ namespace FirUtility
             void Right()//References
             {
                 HashSet<Type> usingTypes = new();
+
+                var attributes = type.GetCustomAttributes();
+                usingTypes.UnionWith(Analyzer.GetRequireComponentTypes(attributes));
+                
+                foreach (var info in type.GetGenericArguments())
+                    usingTypes.UnionWith(Analyzer.GetAllGeneric(info));
+                
                 foreach (var info in type.GetFields(Analyzer.AllBindingFlags))
-                {
                     usingTypes.UnionWith(Analyzer.GetAllGeneric(info.FieldType));
-                }
-                foreach (var info in type.GetProperties(Analyzer.AllBindingFlags))
-                {
+               
+                foreach (var info in type.GetProperties(Analyzer.AllBindingFlags)) 
                     usingTypes.UnionWith(Analyzer.GetAllGeneric(info.PropertyType));
-                }
+                
                 foreach (var constructor in type.GetConstructors(Analyzer.AllBindingFlags))
-                {
                     foreach (var parameterInfo in constructor.GetParameters())
-                    {
                         usingTypes.UnionWith(Analyzer.GetAllGeneric(parameterInfo.ParameterType));
-                    }
-                }
+
+
                 foreach (var method in type.GetMethods(Analyzer.AllBindingFlags))
                 {
                     usingTypes.UnionWith(Analyzer.GetAllGeneric(method.ReturnType));
-                    
                     foreach (var parameterInfo in method.GetParameters())
-                    {
                         usingTypes.UnionWith(Analyzer.GetAllGeneric(parameterInfo.ParameterType));
-                    }
                 }
 
-                Analyzer.ClearCommonTypes(usingTypes);
-
-                nodeCount = usingTypes.Count;
+                Analyzer.ClearTypes(usingTypes);
+                
+                nodeCount = usingTypes.Count + attributes.Count();
                 int i = 0;
-                foreach (var type in usingTypes)
+                foreach (Attribute attribute in attributes)
                 {
+                    Node newNode = new Node("[Attribute " + attribute + "]", map, GetPosition(i, isRightSide: true),
+                        NodeMapSettings.NodeColor.Teal);
+                    centerNode.ConnectNode(newNode);
+                    nodes.Add(newNode);
+                    i++;
+                }
+
+                List<string> names = new List<string>();//T, T2, T[]... We will make sure that generic types are not repeated
+                foreach (Type type in usingTypes)
+                {
+                    string name = type.ToString();
+                    if(names.Contains(name))
+                        continue;
+                    names.Add(name);
+                    
                     Node newNode = new Node(type, map, GetPosition(i, isRightSide: true), Style.GetColorByType(type));
                     centerNode.ConnectNode(newNode);
                     nodes.Add(newNode);
@@ -651,7 +678,7 @@ namespace FirUtility
             {
                 HashSet<Type> usersType = Analyzer.GetAllUsagersOfType(type);
                 
-                Analyzer.ClearCommonTypes(usersType);
+                Analyzer.ClearTypes(usersType);
 
                 nodeCount = usersType.Count;
                 int i = 0;

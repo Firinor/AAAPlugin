@@ -120,7 +120,7 @@ namespace FirUtility
                             : Style.PrivateColor();
                         string staticModifier = field.IsStatic ? Style.StaticColor(" static") : "";
                         EditorGUILayout.LabelField(
-                            $"{accessModifier}{staticModifier} <color=#4EC9B0>{field.FieldType.Name}</color> <color=#DCDCAA>{field.Name}</color>",
+                            $"{accessModifier}{staticModifier} <color=#4EC9B0>{field.FieldType}</color> <color=#DCDCAA>{field.Name}</color>",
                             new GUIStyle(EditorStyles.label) { richText = true });
                     }
                 }
@@ -166,12 +166,12 @@ namespace FirUtility
                             Style.PrivateColor();
 
                         ParameterInfo[] parameters = constructor.GetParameters();
-                        string paramsStr = string.Join(", ", parameters.Select(p =>
-                            $"<color=#4EC9B0>{p.ParameterType.Name}</color> <color=#9CDCFE>{p.Name}</color>"));
+                        string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
+                            $"<color=#4EC9B0>{parameterInfo.ParameterType.Name}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
 
-                        string buttonText =
-                            $"{accessModifier} <b>{constructor.Name}</b>({paramsStr})";
-                        EditorGUILayout.LabelField(buttonText, new GUIStyle(EditorStyles.label) { richText = true });
+                        string text =
+                            $"{accessModifier} <b>{constructor}</b>({paramsStr})";
+                        EditorGUILayout.LabelField(text, new GUIStyle(EditorStyles.label) { richText = true });
                     }
                 }
             }
@@ -193,15 +193,16 @@ namespace FirUtility
                             (method.IsVirtual && (method.GetBaseDefinition() != method)) ? Style.StaticColor(" override") :
                             method.IsVirtual ? Style.StaticColor(" virtual") :
                             "";
-                        string returnType = $"<color=#4EC9B0>{method.ReturnType.Name}</color>";
+                        string returnType = $"<color=#4EC9B0>{method.ReturnType}</color>";
 
+                        string genericStr = Analyzer.GetMethodPostfix(method);
                         ParameterInfo[] parameters = method.GetParameters();
-                        string paramsStr = string.Join(", ", parameters.Select(p =>
-                            $"<color=#4EC9B0>{p.ParameterType.Name}</color> <color=#9CDCFE>{p.Name}</color>"));
+                        string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
+                            $"<color=#4EC9B0>{parameterInfo.ParameterType}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
 
-                        string buttonText =
-                            $"{accessModifier}{staticModifier} {returnType} <b>{method.Name}</b>({paramsStr})";
-                        EditorGUILayout.LabelField(buttonText, new GUIStyle(EditorStyles.label) { richText = true });
+                        string text =
+                            $"{accessModifier}{staticModifier} {returnType} <b>{method.Name}{genericStr}</b>({paramsStr})";
+                        EditorGUILayout.LabelField(text, new GUIStyle(EditorStyles.label) { richText = true });
                     }
                 }
             }
@@ -217,16 +218,18 @@ namespace FirUtility
         
         private void BuildInheritanceInfo(Type type)
         {
-            string result = $"{Analyzer.GetTypePrefix(type)}: {type.Name}";
+            string result = $"{Analyzer.GetTypePrefix(type)}: {type}" +
+                            $"{Environment.NewLine}" +
+                            $"{Analyzer.GetTypePostfix(type)}";
             
             result += Environment.NewLine;
             Type baseType = type.BaseType;
             if (baseType != null)
             {
-                result += "Inherits from: ";
+                result += Style.StaticColor("Inherits from: ");
                 while (baseType != null)
                 {
-                    result += $"{baseType.FullName}";
+                    result += $"{baseType}";
                     baseType = baseType.BaseType;
                     if (baseType != null)
                     {
@@ -239,7 +242,7 @@ namespace FirUtility
             Type[] interfaces = type.GetInterfaces();
             if (interfaces.Length > 0)
             {
-                result += "Implements: ";
+                result += Style.StaticColor("Implements: ");
                 for (int i = 0; i < interfaces.Length; i++)
                 {
                     result += interfaces[i].Name;

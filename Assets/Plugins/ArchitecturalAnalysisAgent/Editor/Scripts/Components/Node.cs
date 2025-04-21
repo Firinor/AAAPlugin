@@ -28,12 +28,15 @@ namespace FirUtility
             Vector2 position,
             NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Blue) 
             
-            : this(type.FullName, mapSettings, position, color)
+            : this(type.ToString(), mapSettings, position, color)
         {
             this.type = type;
-            if (type.IsGenericType)
+            
+            if (String.IsNullOrEmpty(name))
             {
-                name = type.Name;
+                if (!String.IsNullOrEmpty(type.FullName)) name = type.FullName;
+                else if (!String.IsNullOrEmpty(type.Name)) name = type.Name;
+                else if (!String.IsNullOrEmpty(type.UnderlyingSystemType.ToString())) name = type.UnderlyingSystemType.ToString();
             }
         }
         
@@ -91,6 +94,8 @@ namespace FirUtility
 
         public void DrawConnections()
         {
+            Vector2 Vector2offset = new Vector2(5, 5);
+
             foreach (var connection in connections)
             {
                 float directionX = connection.position.x - position.x;
@@ -111,22 +116,26 @@ namespace FirUtility
                 
                 const float arrowSize = 10f;
 
-                Vector2 nodeRectSize = new Vector2(connection.rect.width-arrowSize, connection.rect.height-arrowSize)/2f;
-                Vector2 arrowTip = map.Offset + connection.position * map.Zoom - nodeRectSize * direction;
+                Vector2 nodeRectSize = new Vector2(rect.width-arrowSize, rect.height-arrowSize)/2f ;
+                Vector2 startPosition = map.Offset + position * map.Zoom + (nodeRectSize-Vector2offset) * direction;
+                
+                Vector2 connectionNodeRectSize = new Vector2(connection.rect.width-arrowSize, connection.rect.height-arrowSize)/2f;
+                Vector2 arrowPosition = map.Offset + connection.position * map.Zoom - (connectionNodeRectSize-Vector2offset) * direction;
+                Vector2 endPosition = map.Offset + connection.position * map.Zoom - connectionNodeRectSize * direction;
 
-                Vector2 arrowLeft = arrowTip - (Vector2)(Quaternion.Euler(0, 0, -30) * direction * arrowSize);
-                Vector2 arrowRight = arrowTip - (Vector2)(Quaternion.Euler(0, 0, 30) * direction * arrowSize);
+                Vector2 arrowLeft = endPosition - (Vector2)(Quaternion.Euler(0, 0, -30) * direction * arrowSize);
+                Vector2 arrowRight = endPosition - (Vector2)(Quaternion.Euler(0, 0, 30) * direction * arrowSize);
 
                 Handles.DrawBezier(
-                    map.Offset + position * map.Zoom,
-                    arrowTip,
-                    map.Offset + position * map.Zoom + direction * 50f,
-                    arrowTip - direction * 50f,
+                    startPosition,
+                    endPosition,
+                    startPosition + direction * 50f,
+                    endPosition - direction * 50f,
                     Color.white,
                     null,
                     4f
                 );
-                Handles.DrawAAConvexPolygon(arrowTip, arrowLeft, arrowRight, arrowTip);
+                Handles.DrawAAConvexPolygon(arrowPosition, arrowLeft, arrowRight, endPosition);
             }
         }
         

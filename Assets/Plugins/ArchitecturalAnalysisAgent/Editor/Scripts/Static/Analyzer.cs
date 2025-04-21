@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -55,7 +56,7 @@ namespace FirUtility
                     foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
                     {
                         types.AddRange(assemblyObject.GetTypes()
-                            .Where(a => a.Name == typeName)
+                            .Where(a => a.ToString() == typeName)
                             .ToArray());
                     }
 
@@ -86,7 +87,7 @@ namespace FirUtility
             try
             {
                 type = assembly.GetTypes()
-                    .FirstOrDefault(a => a.FullName == typeName);
+                    .FirstOrDefault(a => a.ToString() == typeName);
             }
             catch (Exception e)
             {
@@ -150,9 +151,85 @@ namespace FirUtility
                 return type.GetMethods().Any(m => m.Name == "<Clone>$");
             }
         }
-
-        public static void ClearCommonTypes(HashSet<Type> usingTypes)
+        public static string GetTypePostfix(Type type)
         {
+            if(type is null) 
+                return string.Empty;
+
+            bool isResultEmpty = true;
+            
+            StringBuilder result = new(" <");
+            
+            if (type.IsGenericType)
+            {
+                var typesEnum = type.GetGenericArguments().GetEnumerator();
+                bool first = true;
+                while (typesEnum.MoveNext())
+                {
+                    if(!first)
+                        result.Append(", ");
+                    
+                    Type nextGenericType = typesEnum.Current as Type;
+                    
+                    var genericInterfaces = nextGenericType.GetInterfaces();
+                    if (genericInterfaces is not null && genericInterfaces.Length > 0)
+                    {
+                        result.Append(nextGenericType);
+                        result.Append($" is {genericInterfaces[0]}");
+                        isResultEmpty = false;
+                        first = false;
+                    }
+                    else if (nextGenericType.BaseType is not null
+                             && nextGenericType.BaseType != typeof(Object))
+                    {
+                        result.Append(nextGenericType);
+                        result.Append($" is {nextGenericType.BaseType}");
+                        isResultEmpty = false;
+                        first = false;
+                    }
+                }
+            }
+
+            if (isResultEmpty)
+                return string.Empty;
+            
+            result.Append(">");
+            return result.ToString();
+        }
+        public static string GetMethodPostfix(MethodInfo info)
+        {
+            var types = info.GetGenericArguments();
+            
+            if(types is null || types.Length == 0) 
+                return string.Empty;
+            
+            StringBuilder result = new("<");
+            
+            bool first = true;
+            foreach (Type type in types)
+            {
+                if(!first)
+                    result.Append(", ");
+
+                first = false;
+                
+                result.Append(type);
+                
+                var genericInterfaces = type.GetInterfaces();
+                if(genericInterfaces is not null && genericInterfaces.Length > 0)
+                    result.Append($" is {genericInterfaces[0]}");
+                else if(type.BaseType is not null
+                        && type.BaseType != typeof(Object))
+                    result.Append($" is {type.BaseType}");
+            }
+
+            result.Append(">");
+            return result.ToString();
+        }
+
+        public static void ClearTypes(HashSet<Type> usingTypes)
+        {
+            usingTypes.Remove(null);
             usingTypes.Remove(typeof(void));
             usingTypes.Remove(typeof(string));
             usingTypes.Remove(typeof(int));
@@ -163,14 +240,26 @@ namespace FirUtility
 
         public static IEnumerable<Type> GetAllGeneric(Type type)
         {
+            if(type is null) 
+                yield break;
+            
             yield return type;
+            
             if (type.IsGenericType)
             {
                 var typesEnum = type.GetGenericArguments().GetEnumerator();
                 while (typesEnum.MoveNext())
                 {
-                    yield return typesEnum.Current as Type;
+                    Type nextGenericType = typesEnum.Current as Type;
+                    yield return nextGenericType;
+                    yield return nextGenericType.BaseType;
                 }
+            }
+            if (type.IsGenericParameter)
+            {
+                var genericInterfaces = type.GetInterfaces();
+                if(genericInterfaces is not null && genericInterfaces.Length > 0)
+                    yield return genericInterfaces[0];
             }
         }
         
@@ -256,59 +345,37 @@ namespace FirUtility
             
             bool FindInType(Type assemblyType)
             {
+                var attributes = type.GetCustomAttributes();
+                foreach (var info in GetRequireComponentTypes(attributes))
+                    foreach (var foundedType in GetAllGeneric(info))
+                        if (type.IsAssignableFrom(foundedType)) return true;
+                    
+                foreach (var info in assemblyType.GetGenericArguments())
+                    foreach (var foundedType in GetAllGeneric(info))
+                       if (type.IsAssignableFrom(foundedType))
+                            return true;
+               
                 foreach (var info in assemblyType.GetFields(AllBindingFlags))
-                {
                     foreach (var foundedType in GetAllGeneric(info.FieldType))
-                    {
-                        if (type.IsAssignableFrom(foundedType))
-                        {
-                            return true;
-                        }
-                    }
-                }
+                        if (type.IsAssignableFrom(foundedType)) return true;
+            
                 foreach (var info in assemblyType.GetProperties(AllBindingFlags))
-                {
                     foreach (var foundedType in GetAllGeneric(info.PropertyType))
-                    {
-                        if (type.IsAssignableFrom(foundedType))
-                        {
-                            return true;
-                        }
-                    }
-                }
+                        if (type.IsAssignableFrom(foundedType)) return true;
+                
                 foreach (var constructor in assemblyType.GetConstructors(AllBindingFlags))
-                {
                     foreach (var parameterInfo in constructor.GetParameters())
-                    {
                         foreach (var foundedType in GetAllGeneric(parameterInfo.ParameterType))
-                        {
-                            if (type.IsAssignableFrom(foundedType))
-                            {
-                                return true;
-                            }
-                        }
-                    }
-                }
+                            if (type.IsAssignableFrom(foundedType)) return true;
+                
                 foreach (var method in assemblyType.GetMethods(AllBindingFlags))
                 {
                     foreach (var foundedType in GetAllGeneric(method.ReturnType))
-                    {
-                        if (type.IsAssignableFrom(foundedType))
-                        {
-                            return true;
-                        }
-                    }
-                    
+                        if (type.IsAssignableFrom(foundedType)) return true;
+                            
                     foreach (var parameterInfo in method.GetParameters())
-                    {
                         foreach (var foundedType in GetAllGeneric(parameterInfo.ParameterType))
-                        {
-                            if (type.IsAssignableFrom(foundedType))
-                            {
-                                return true;
-                            }
-                        }
-                    }
+                            if (type.IsAssignableFrom(foundedType)) return true;
                 }
 
                 return false;
@@ -348,12 +415,39 @@ namespace FirUtility
 
             ShowScriptInfo(type);
         }
+        public static void ShowScriptInfo(MonoScript monoScript)
+        {
+            Type type = monoScript.GetClass();
+            if (monoScript.GetClass() is null)
+            {
+                Debug.LogError("Couldn't detect type inside the file " + monoScript.name + "!");
+                return;
+            }
+            
+            TypeAnalyzerWindow analysisInfoWindow = EditorWindow.CreateInstance<TypeAnalyzerWindow>();
+            analysisInfoWindow.SetType(type);
+            analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
+            analysisInfoWindow.Show();
+        }
         public static void ShowScriptInfo(Type type)
         {
             TypeAnalyzerWindow analysisInfoWindow = EditorWindow.CreateInstance<TypeAnalyzerWindow>();
             analysisInfoWindow.SetType(type);
             analysisInfoWindow.titleContent = new GUIContent(type.Name + " info");
             analysisInfoWindow.Show();
+        }
+
+        public static IEnumerable<Type> GetRequireComponentTypes(IEnumerable<Attribute> attributes)
+        {
+            foreach (var attribute in attributes)
+            {
+                if (attribute is RequireComponent requireComponent)
+                {
+                    yield return requireComponent.m_Type0;
+                    yield return requireComponent.m_Type1;
+                    yield return requireComponent.m_Type2;
+                }
+            }
         }
     }
 }
