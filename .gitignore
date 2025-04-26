@@ -1,4 +1,4 @@
 # Ignore everything
 *
 #But not this folder
-!/ArchitecturalAnalysisAgent
+!/Editor/ArchitecturalAnalysisAgent
