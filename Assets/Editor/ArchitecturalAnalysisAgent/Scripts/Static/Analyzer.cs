@@ -518,5 +518,10 @@ namespace FirUtility
                 }
             }
         }
+        
+        public static bool IsStaticClass(Type type)
+        {
+            return type.IsAbstract && type.IsSealed;
+        }
     }
 }

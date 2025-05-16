@@ -20,10 +20,10 @@ namespace FirUtility
         
         //Right mode
         private string[] assemblyNames;
-        private bool assemblyGroup;
+        private bool assemblyGroup = true;
         private string selectedAssemblyString;
         private string[] scriptNames;
-        private bool scriptGroup;
+        private bool scriptGroup = true;
         private string selectedScriptString;
 
         private NodeMapSettings map;

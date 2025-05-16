@@ -32,8 +32,10 @@ namespace FirUtility
             GUILayout.Label("Namespaces count: " + namespacesCount, EditorStyles.boldLabel);
             
             EditorGUILayout.Space();
-            int classCount = types.Count(t => t.IsClass);
-            GUILayout.Label("Classes count: " + classCount, EditorStyles.boldLabel);
+            int staticClassCount = types.Count(t => t.IsClass && Analyzer.IsStaticClass(t));
+            GUILayout.Label("Static classes count: " + staticClassCount, EditorStyles.boldLabel);
+            int classCount = types.Count(t => t.IsClass && !Analyzer.IsStaticClass(t));
+            GUILayout.Label("Non-static classes count: " + classCount, EditorStyles.boldLabel);
             int interfaceCount = types.Count(t => t.IsInterface);
             GUILayout.Label("Interfaces count: " + interfaceCount, EditorStyles.boldLabel);
             int structCount = types.Count(t => t.IsValueType && !t.IsEnum);

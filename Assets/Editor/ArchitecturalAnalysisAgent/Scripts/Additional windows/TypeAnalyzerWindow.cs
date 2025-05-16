@@ -14,7 +14,7 @@ namespace FirUtility
 
         private string inheritanceInfo;
         
-        private bool groupInfo;
+        private bool groupInfo = true;
         private bool privateInfo = true;
 
         public void SetType(MonoScript mono)
