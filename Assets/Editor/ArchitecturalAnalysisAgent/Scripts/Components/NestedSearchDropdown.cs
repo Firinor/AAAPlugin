@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if UNITY_2020_1_OR_NEWER
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.IMGUI.Controls;
@@ -95,3 +96,4 @@ public class NestedSearchDropdown : AdvancedDropdown
         }
     }
 }
+#endif

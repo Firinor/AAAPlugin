@@ -24,7 +24,7 @@ namespace FirUtility
         {
             if (nodeStyle is null || nodeStyle.Count == 0)
             {
-                nodeStyle = new();
+                nodeStyle = new List<GUIStyle>();
 
                 for (int i = 0; i < 7; i++)
                 {
@@ -48,7 +48,7 @@ namespace FirUtility
         {
             if (selectedStyle is null || selectedStyle.Count == 0)
             {
-                selectedStyle = new();
+                selectedStyle = new List<GUIStyle>();
 
                 for (int i = 0; i < 7; i++)
                 {
@@ -69,14 +69,19 @@ namespace FirUtility
         }
         public static GUIStyle Button()
         {
-            return buttonStyle ??= new GUIStyle(GUI.skin.button)
+            if (buttonStyle is null)
             {
-                stretchHeight = true,
-                padding = new RectOffset(),
-                alignment = TextAnchor.MiddleCenter,
-                fixedWidth = 20,
-                fixedHeight = 20
-            };
+                buttonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    stretchHeight = true,
+                    padding = new RectOffset(),
+                    alignment = TextAnchor.MiddleCenter,
+                    fixedWidth = 20,
+                    fixedHeight = 20
+                };
+            }
+
+            return buttonStyle;
         }
 
         public static NodeMapSettings.NodeColor GetColorByType(Type type)

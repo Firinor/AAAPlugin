@@ -17,7 +17,7 @@ namespace FirUtility
         private bool isDragged;
         private bool isSelected;
 
-        public HashSet<Node> connections = new();
+        public HashSet<Node> connections = new HashSet<Node>();
 
         private Action<Node> OnRemoveNode;
         
@@ -200,7 +200,7 @@ namespace FirUtility
             genericMenu.AddItem(new GUIContent("Remove connections"), false, 
                 () => map.OnRemoveConnections?.Invoke(this));
             genericMenu.AddItem(new GUIContent("Copy name"), false, 
-                () => map.OnCopyNode?.Invoke(name.Split(".").Last()));
+                () => map.OnCopyNode?.Invoke(name.Split('.').Last()));
             genericMenu.AddItem(new GUIContent("Change node"), false, 
                 () => map.OnEditNode?.Invoke(this));
             genericMenu.AddItem(new GUIContent("Remove node"), false, 

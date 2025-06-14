@@ -85,7 +85,7 @@ namespace FirUtility
                     && currentEvent.keyCode == KeyCode.C 
                     && (currentEvent.control || currentEvent.command))
                 {
-                    CopyClassNameToClipboard(selectedScriptString.Split(".").Last());
+                    CopyClassNameToClipboard(selectedScriptString.Split('.').Last());
                     currentEvent.Use(); // Marking the event as processed
                 }
             }
@@ -118,7 +118,7 @@ namespace FirUtility
                     "Select Assembly", selectedAssembly, typeof(AssemblyDefinitionAsset), false) 
                 as AssemblyDefinitionAsset;
             
-            if (selectedAssembly is not null 
+            if (selectedAssembly != null 
                 && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
             {
                 Analyzer.ShowAssemblyInfo(selectedAssembly);
@@ -127,9 +127,9 @@ namespace FirUtility
             
             EditorGUILayout.BeginHorizontal();
             selectedMonoScript = EditorGUILayout.ObjectField(
-                    "Select Script", selectedMonoScript, typeof(MonoScript), targetBeingEdited: default) 
+                    "Select Script", selectedMonoScript, typeof(MonoScript)) 
                 as MonoScript;
-            if (selectedMonoScript is not null)
+            if (selectedMonoScript != null)
             {
                 if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),
                         Style.Button()))
@@ -226,6 +226,7 @@ namespace FirUtility
 
         private void ShowAdvancedDropdown(Rect assemblyRect, string[] content, bool isNeedGroup, Action<string> onSelected)
         {
+#if UNITY_2020_1_OR_NEWER
             var dropdown = new NestedSearchDropdown(
                 state: new AdvancedDropdownState(),
                 content: content,
@@ -234,6 +235,16 @@ namespace FirUtility
             );
 
             dropdown.Show(assemblyRect);
+#else
+            GenericMenu menu = new GenericMenu();
+    
+            foreach (var item in content)
+            { 
+                menu.AddItem(new GUIContent(item), false, () => onSelected(item));
+            }
+    
+            menu.DropDown(assemblyRect);
+#endif
         }
 #endregion
 
@@ -396,8 +407,7 @@ namespace FirUtility
                 Vector3.forward,     
                 Vector3.up,   
                 360f,          
-                20 * map.Zoom,
-                3
+                20 * map.Zoom
             );
             
             Handles.color = new Color(gridColor.r, gridColor.g, gridColor.b, gridOpacity);
@@ -473,7 +483,7 @@ namespace FirUtility
 
                     if (e.button == 1)
                     {
-                        if(newConnection is not null)
+                        if(newConnection != null)
                             newConnection = null;
                         else
                             ProcessContextMenu(e.mousePosition);
@@ -586,14 +596,14 @@ namespace FirUtility
                 Type parent = type.BaseType;
                 Type[] interfaces = type.GetInterfaces();
 
-                bool isInterfaces = interfaces is not null && interfaces.Length > 0;
-                bool isParents = parent is not null;
+                bool isInterfaces = interfaces != null && interfaces.Length > 0;
+                bool isParents = parent != null;
                 
-                Vector2 offset = new(0, -nodeStep);
-                Vector2 classOffset = new(isInterfaces ? -nodeStep : 0, 0);
+                Vector2 offset = new Vector2(0, -nodeStep);
+                Vector2 classOffset = new Vector2(isInterfaces ? -nodeStep : 0, 0);
                 
                 int index = 1;
-                while (parent is not null)
+                while (parent != null)
                 {
                     Node newNode = new Node(parent, map,
                         classOffset + offset * index, Style.GetColorByType(parent));
@@ -606,7 +616,7 @@ namespace FirUtility
                 }
                 if (!isInterfaces) return;
                 
-                Vector2 interfaceOffset = new(isParents ? nodeStep : 0, -nodeStep);
+                Vector2 interfaceOffset = new Vector2(isParents ? nodeStep : 0, -nodeStep);
                 for(var i = 0; i < interfaces.Length; i++)
                 {
                     Node newNode = new Node(interfaces[i], map,
@@ -617,9 +627,9 @@ namespace FirUtility
             }
             void Right()//References
             {
-                HashSet<Type> usingTypes = new();
+                HashSet<Type> usingTypes = new HashSet<Type>();
 
-                HashSet<Attribute> attributes = new(type.GetCustomAttributes());
+                HashSet<Attribute> attributes = new HashSet<Attribute>(type.GetCustomAttributes());
                 Analyzer.ClearAttributes(attributes);
                 usingTypes.UnionWith(Analyzer.GetRequireComponentTypes(attributes));
                 
@@ -658,14 +668,14 @@ namespace FirUtility
                 }
 
                 List<string> names = new List<string>();//T, T2, T[]... We will make sure that generic types are not repeated
-                foreach (Type type in usingTypes)
+                foreach (Type usingType in usingTypes)
                 {
-                    string name = type.ToString();
+                    string name = usingType.ToString();
                     if(names.Contains(name))
                         continue;
                     names.Add(name);
                     
-                    Node newNode = new Node(type, map, GetPosition(i, isRightSide: true), Style.GetColorByType(type));
+                    Node newNode = new Node(usingType, map, GetPosition(i, isRightSide: true), Style.GetColorByType(usingType));
                     centerNode.ConnectNode(newNode);
                     nodes.Add(newNode);
                     i++;
@@ -676,7 +686,7 @@ namespace FirUtility
                 var inheritors = Analyzer.GetAllInheritorOfType(type);
                 if(inheritors is null) return;
                 
-                Vector2 offset = new(0, nodeStep);
+                Vector2 offset = new Vector2(0, nodeStep);
                 int i = 1;
                 foreach (Type inheritor in inheritors)
                 {
@@ -697,9 +707,9 @@ namespace FirUtility
 
                 nodeCount = usersType.Count;
                 int i = 0;
-                foreach (var type in usersType)
+                foreach (var userType in usersType)
                 {
-                    Node newNode = new Node(type, map, GetPosition(i, isRightSide: false), Style.GetColorByType(type));
+                    Node newNode = new Node(userType, map, GetPosition(i, isRightSide: false), Style.GetColorByType(userType));
                     newNode.ConnectNode(centerNode);
                     nodes.Add(newNode);
                     i++;
@@ -711,9 +721,9 @@ namespace FirUtility
                 int columnCap = Math.Min(10, nodeCount);
                 if (columnCap == 0) columnCap = 1;
                 
-                Vector2Int startPoint = new((isRightSide? 1 : -1) * nodeStep * 5, nodeStep * -(columnCap-1)/2);
-                Vector2Int columnOffset = new((isRightSide? 1 : -1) * nodeStep * 4, 0);
-                Vector2Int rowStep = new(0, nodeStep);
+                Vector2Int startPoint = new Vector2Int((isRightSide? 1 : -1) * nodeStep * 5, nodeStep * -(columnCap-1)/2);
+                Vector2Int columnOffset = new Vector2Int((isRightSide? 1 : -1) * nodeStep * 4, 0);
+                Vector2Int rowStep = new Vector2Int(0, nodeStep);
 
                 return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));
             }

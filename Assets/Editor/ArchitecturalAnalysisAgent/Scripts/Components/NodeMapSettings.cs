@@ -6,7 +6,7 @@ namespace FirUtility
 {
     public class NodeMapSettings
     {
-        public Vector2 DefaultOffset => new (window.position.width/2f, window.position.height/2f);
+        public Vector2 DefaultOffset => new Vector2(window.position.width/2f, window.position.height/2f);
 
         public NodeMapSettings(EditorWindow window)
         {

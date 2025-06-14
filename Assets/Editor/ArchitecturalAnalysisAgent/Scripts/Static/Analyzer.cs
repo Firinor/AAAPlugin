@@ -52,7 +52,7 @@ namespace FirUtility
             {
                 try
                 {
-                    List<Type> types = new();
+                    List<Type> types = new List<Type>();
 
                     foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
                     {
@@ -147,9 +147,9 @@ namespace FirUtility
                 return "unknown";
             }
             
-            bool IsRecord(Type type)
+            bool IsRecord(Type checkType)
             {
-                return type.GetMethods().Any(m => m.Name == "<Clone>$");
+                return checkType.GetMethods().Any(m => m.Name == "<Clone>$");
             }
         }
         public static string GetTypePostfix(Type type)
@@ -159,7 +159,7 @@ namespace FirUtility
 
             bool isResultEmpty = true;
             
-            StringBuilder result = new(" <");
+            StringBuilder result = new StringBuilder(" <");
             
             if (type.IsGenericType)
             {
@@ -172,7 +172,7 @@ namespace FirUtility
                     bool firstWhereType = true;
                     string localResult = "";
                     
-                    if (nextGenericType.BaseType is not null
+                    if (nextGenericType.BaseType != null
                         && nextGenericType.BaseType != typeof(Object))
                     {
                         localResult = Style.ClassColor(nextGenericType.ToString()) + " is " + nextGenericType.BaseType;
@@ -181,7 +181,7 @@ namespace FirUtility
                     }
                     
                     var genericInterfaces = nextGenericType.GetInterfaces();
-                    if (genericInterfaces is not null && genericInterfaces.Length > 0)
+                    if (genericInterfaces != null && genericInterfaces.Length > 0)
                     {
                         foreach (var genericInterface in genericInterfaces)
                         {
@@ -223,7 +223,7 @@ namespace FirUtility
             
             bool isResultEmpty = true;
             
-            StringBuilder result = new("<");
+            StringBuilder result = new StringBuilder("<");
             
             bool first = true;
             foreach (Type type in types)
@@ -237,7 +237,7 @@ namespace FirUtility
                 
                 bool firstWhereType = true;
                     
-                if (type.BaseType is not null
+                if (type.BaseType != null
                     && type.BaseType != typeof(Object))
                 {
                     result.Append(" is " + type.BaseType);
@@ -246,7 +246,7 @@ namespace FirUtility
                 }
                     
                 var genericInterfaces = type.GetInterfaces();
-                if (genericInterfaces is not null && genericInterfaces.Length > 0)
+                if (genericInterfaces != null && genericInterfaces.Length > 0)
                 {
                     foreach (var genericInterface in genericInterfaces)
                     {
@@ -327,7 +327,7 @@ namespace FirUtility
             if (type.IsSealed)
                 return null;
 
-            HashSet<Type> types = new();
+            HashSet<Type> types = new HashSet<Type>();
 
             if (type.IsInterface)
             {
@@ -369,7 +369,7 @@ namespace FirUtility
             if (type is null)
                 return null;
 
-            HashSet<Type> types = new();
+            HashSet<Type> types = new HashSet<Type>();
             
             foreach (var assemblyObject in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -492,7 +492,7 @@ namespace FirUtility
 
         public static void ClearAttributes(HashSet<Attribute> attributes)
         {
-            HashSet<Attribute> blackList = new();
+            HashSet<Attribute> blackList = new HashSet<Attribute>();
             
             foreach (var attribute in attributes)
             {

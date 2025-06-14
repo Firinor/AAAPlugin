@@ -52,6 +52,14 @@ namespace FirUtility
         }
         private void OnGUI()
         {
+#if !UNITY_2020_1_OR_NEWER
+            //Set dark background color
+            Texture2D bgTex = new Texture2D(1, 1);
+            bgTex.SetPixel(0, 0, new Color(.25f, .25f, .25f));
+            bgTex.Apply();
+            GUI.DrawTexture(new Rect(0, 0, position.width, position.height), bgTex);
+#endif
+            
             if (selectedType is null)
                 return;
             
@@ -109,7 +117,7 @@ namespace FirUtility
                 EditorGUILayout.LabelField($"<b>Fields ({fields.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
-                if (fields is not null)
+                if (fields != null)
                 {
                     foreach (FieldInfo field in fields)
                     {
@@ -129,7 +137,7 @@ namespace FirUtility
                 EditorGUILayout.LabelField($"<b>Properties ({properties.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
-                if (properties is not null)
+                if (properties != null)
                 {
                     foreach (PropertyInfo property in properties)
                     {
@@ -155,7 +163,7 @@ namespace FirUtility
                 EditorGUILayout.LabelField($"<b>Constructors ({constructors.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
-                if (constructors is not null)
+                if (constructors != null)
                 {
                     foreach (ConstructorInfo constructor in constructors)
                     {
@@ -179,7 +187,7 @@ namespace FirUtility
                 EditorGUILayout.LabelField($"<b>Methods ({methods.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
-                if (methods is not null)
+                if (methods != null)
                 {
                     foreach (MethodInfo method in methods)
                     {
