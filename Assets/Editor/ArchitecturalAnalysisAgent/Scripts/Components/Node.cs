@@ -194,7 +194,10 @@ namespace FirUtility
                     break;
                 case EventType.KeyDown:
                     if (e.keyCode == KeyCode.Delete && isSelected)
+                    {
                         OnRemoveNode?.Invoke(this);
+                        return true;
+                    }
                     break;
             }
 
