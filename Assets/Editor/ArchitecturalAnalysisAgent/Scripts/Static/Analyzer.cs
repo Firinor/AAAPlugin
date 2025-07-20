@@ -69,6 +69,7 @@ namespace FirUtility
 
                     if (types.Count > 1)
                     {
+                        type = types[0];
                         Debug.LogError("Found more than 1 type with a matching name");
                     }
                     if (types.Count < 1)

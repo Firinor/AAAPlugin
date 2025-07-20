@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEditorInternal;
@@ -22,8 +23,9 @@ namespace FirUtility
         private string[] assemblyNames;
         private bool assemblyGroup = true;
         private string selectedAssemblyString;
-        private string[] scriptNames;
+        private HashSet<string> scriptNames;
         private bool scriptGroup = true;
+        private bool assemblyFilter = true;
         private string selectedScriptString;
 
         private NodeMapSettings map;
@@ -111,11 +113,14 @@ namespace FirUtility
 
         private void LeftCodeSelector()
         {
-            EditorGUILayout.BeginVertical();
+            EditorGUILayout.BeginVertical(GUILayout.Width(position.width / 2.03f));
             
             EditorGUILayout.BeginHorizontal();
             selectedAssembly = EditorGUILayout.ObjectField(
-                    "Select Assembly", selectedAssembly, typeof(AssemblyDefinitionAsset), false) 
+                    "Select Assembly", 
+                    selectedAssembly, 
+                    typeof(AssemblyDefinitionAsset), 
+                    false) 
                 as AssemblyDefinitionAsset;
             
             if (selectedAssembly != null 
@@ -127,7 +132,10 @@ namespace FirUtility
             
             EditorGUILayout.BeginHorizontal();
             selectedMonoScript = EditorGUILayout.ObjectField(
-                    "Select Script", selectedMonoScript, typeof(MonoScript)) 
+                    label: "Select Script",
+                    selectedMonoScript, 
+                    typeof(MonoScript),
+                    allowSceneObjects: false) 
                 as MonoScript;
             if (selectedMonoScript != null)
             {
@@ -150,7 +158,7 @@ namespace FirUtility
 
         private void RightCodeSelector()
         {
-            EditorGUILayout.BeginVertical();
+            EditorGUILayout.BeginVertical(GUILayout.Width(position.width / 2.03f));
             
             EditorGUILayout.BeginHorizontal();
             
@@ -162,9 +170,10 @@ namespace FirUtility
                     selectedAssemblyString = path;
                     selectedScriptString = "";
                     RepaintWindow();
+                    assemblyFilter = true;
                 });
             }
-
+            
             string folderSymbol = assemblyGroup ? "d_Folder Icon" : "d_TextAsset Icon";
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
             {
@@ -181,23 +190,42 @@ namespace FirUtility
             Rect scriptRect = EditorGUILayout.GetControlRect();
             if (EditorGUI.DropdownButton(scriptRect, new GUIContent($"Script: {selectedScriptString}"), FocusType.Passive))
             {
-                if (String.IsNullOrEmpty(selectedAssemblyString))
+                List<Type> types = new();
+                if (assemblyFilter)
                 {
-                    EditorUtility.DisplayDialog("Error", "Select assembly first", "ОК");
-                    return;
-                }
-                
-                Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
+                    if (String.IsNullOrEmpty(selectedAssemblyString))
+                    {
+                        EditorUtility.DisplayDialog("Error", "Select assembly first", "ОК");
+                        return;
+                    }
 
-                Type[] types = assembly.GetTypes();
-                scriptNames = types.Select(t => t.ToString()).ToArray();
+                    Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
+                        .FirstOrDefault(a => a.GetName().Name == selectedAssemblyString);
+
+                    types = assembly.GetTypes().ToList();
+                }
+                else
+                {
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        types.AddRange(assembly.GetTypes()
+                            .Where(t => !t.ToString().Contains('<')));//Types with the '<' symbol is no interest to us
+                    }
+                }
+
+                scriptNames = new();
+                scriptNames.UnionWith(types.Select(t => t.ToString()));
                 
-                ShowAdvancedDropdown(scriptRect, scriptNames,  scriptGroup,(path) =>
+                ShowAdvancedDropdown(scriptRect, scriptNames.ToArray(),  scriptGroup,(path) =>
                 {
                     selectedScriptString = path; 
                     RepaintWindow();
                 });
+            }
+            string assemblyFilterIconString = assemblyFilter ? "Assembly filter ON" : "Assembly filter OFF";
+            if (GUILayout.Button( new GUIContent(assemblyFilterIconString), new GUIStyle(Style.Button()){fixedWidth = 120}))
+            {
+                assemblyFilter = !assemblyFilter;
             }
             folderSymbol = scriptGroup ? "d_Folder Icon" : "d_TextAsset Icon";
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
@@ -215,8 +243,13 @@ namespace FirUtility
 
                 if (GUILayout.Button("▼", Style.Button()))
                 {
-                    if (Analyzer.GetTypeByName(out Type type, selectedScriptString, selectedAssemblyString))
-                        GenerateNodes(type);
+                    Type type = null;
+                    if (assemblyFilter)
+                        Analyzer.GetTypeByName(out type, selectedScriptString, selectedAssemblyString);
+                    else
+                        Analyzer.GetTypeByName(out type, selectedScriptString);
+                    
+                    GenerateNodes(type);
                 }
             }
 
@@ -442,14 +475,16 @@ namespace FirUtility
 
             if (newConnection is null)
             {
+                bool isNodeCanSelected = true;
                 for (int i = nodes.Count - 1; i >= 0; i--)
                 {
-                    bool guiChanged = nodes[i].ProcessEvents(e);
-
+                    bool guiChanged = nodes[i].ProcessEvents(e, isNodeCanSelected);
                     if (guiChanged)
-                    {
-                        GUI.changed = true;
-                    }
+                        isNodeCanSelected = false;
+                }
+                if (!isNodeCanSelected)
+                {
+                    GUI.changed = true;
                 }
             }
             else if(e.type == EventType.MouseDown && e.button == 0)
@@ -492,7 +527,7 @@ namespace FirUtility
                     break;
 
                 case EventType.MouseDrag:
-                    if (e.button == 0) // Левая кнопка мыши - перемещение
+                    if (e.button == 0) // Left mouse click
                     {
                         OnDrag(e.delta);
                     }
@@ -537,22 +572,31 @@ namespace FirUtility
             {
                 ToStartPoint();
             });
+            genericMenu.AddItem(new GUIContent("Delete technical nodes"), false, () =>
+            {
+                ClearTechnicalNodes();
+            });
             genericMenu.ShowAsContext();
+        }
+
+        private void ClearTechnicalNodes()
+        {
+            if(nodes.Count() <= 1) return;
+            
+            for (int i = nodes.Count()-1; i >= 1; i--)
+            {
+                if (nodes[i].name.Contains('<'))
+                {
+                    nodes[0].connections.Remove(nodes[i]);
+                    nodes[i].connections = null;
+                    nodes.Remove(nodes[i]);
+                }
+            }
         }
 
         private void ToStartPoint()
         {
             map.Offset = new Vector2(position.width/2f, position.height/2f);
-        }
-
-        private void ClearNodeSelection()
-        {
-            if (nodes == null) return;
-            
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                nodes[i].Unselect();
-            }
         }
 
         private void GenerateNodes(MonoScript monoScript)
@@ -573,8 +617,10 @@ namespace FirUtility
             Node lastCreatedNode;
             Node centerNode;
             
-            int nodeStep = 50;
+            int xStep = 50;
+            int yStep = 50;
             int nodeCount = 0;
+            int gap = 40;
             
             ClearAllNodes();
             ToStartPoint();
@@ -590,6 +636,8 @@ namespace FirUtility
                 centerNode = new Node(type, map, Vector2.zero, Style.GetColorByType(type));
                 nodes.Add(centerNode);
                 lastCreatedNode = centerNode;
+
+                xStep = Mathf.Max(xStep, centerNode.name.Length);
             }
             void Up()//Parents
             {
@@ -599,8 +647,8 @@ namespace FirUtility
                 bool isInterfaces = interfaces != null && interfaces.Length > 0;
                 bool isParents = parent != null;
                 
-                Vector2 offset = new Vector2(0, -nodeStep);
-                Vector2 classOffset = new Vector2(isInterfaces ? -nodeStep : 0, 0);
+                Vector2 offset = new Vector2(0, -yStep);
+                Vector2 classOffset = new Vector2(isInterfaces ? -xStep : 0, 0);
                 
                 int index = 1;
                 while (parent != null)
@@ -616,7 +664,7 @@ namespace FirUtility
                 }
                 if (!isInterfaces) return;
                 
-                Vector2 interfaceOffset = new Vector2(isParents ? nodeStep : 0, -nodeStep);
+                Vector2 interfaceOffset = new Vector2(isParents ? xStep : 0, -yStep * 1.5f);
                 for(var i = 0; i < interfaces.Length; i++)
                 {
                     Node newNode = new Node(interfaces[i], map,
@@ -657,6 +705,8 @@ namespace FirUtility
                 Analyzer.ClearTypes(usingTypes);
                 
                 nodeCount = usingTypes.Count + attributes.Count();
+                xStep = CalculateXStep(usingTypes, attributes);
+                
                 int i = 0;
                 foreach (Attribute attribute in attributes)
                 {
@@ -686,7 +736,7 @@ namespace FirUtility
                 var inheritors = Analyzer.GetAllInheritorOfType(type);
                 if(inheritors is null) return;
                 
-                Vector2 offset = new Vector2(0, nodeStep);
+                Vector2 offset = new Vector2(0, yStep);
                 int i = 1;
                 foreach (Type inheritor in inheritors)
                 {
@@ -706,6 +756,8 @@ namespace FirUtility
                 Analyzer.ClearTypes(usersType);
 
                 nodeCount = usersType.Count;
+                xStep = CalculateXStep(usersType);
+                
                 int i = 0;
                 foreach (var userType in usersType)
                 {
@@ -721,11 +773,25 @@ namespace FirUtility
                 int columnCap = Math.Min(10, nodeCount);
                 if (columnCap == 0) columnCap = 1;
                 
-                Vector2Int startPoint = new Vector2Int((isRightSide? 1 : -1) * nodeStep * 5, nodeStep * -(columnCap-1)/2);
-                Vector2Int columnOffset = new Vector2Int((isRightSide? 1 : -1) * nodeStep * 4, 0);
-                Vector2Int rowStep = new Vector2Int(0, nodeStep);
+                Vector2Int startPoint = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, yStep * -(columnCap-1)/2);
+                Vector2Int columnOffset = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, 0);
+                Vector2Int rowStep = new Vector2Int(0, yStep);
 
                 return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));
+            }
+            
+            int CalculateXStep(HashSet<Type> usingTypes = null, HashSet<Attribute> attributes = null)
+            {
+                int maxTypeNameLength = 0;
+                int maxAttributeNameLength = 0;
+                
+                if (usingTypes is not null && usingTypes.Count > 0)
+                    maxTypeNameLength = usingTypes.Max(_type => _type.ToString().Length);
+                
+                if(attributes is not null && attributes.Count > 0)
+                    maxAttributeNameLength = attributes.Max(_attribute => _attribute.ToString().Length);
+                
+                return Mathf.Max(maxTypeNameLength + gap, maxAttributeNameLength + gap);
             }
         }
 

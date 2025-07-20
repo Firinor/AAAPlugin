@@ -65,7 +65,7 @@ namespace FirUtility
                 }
             }
 
-            return nodeStyle[colorIndex];
+            return selectedStyle[colorIndex];
         }
         public static GUIStyle Button()
         {

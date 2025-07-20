@@ -58,11 +58,7 @@ namespace FirUtility
         {
             position += delta / map.Zoom;
         }
-
-        public void Unselect()
-        {
-            isSelected = false;
-        }
+        
         public void Draw()
         {
             GUIStyle styleToUse = isSelected ? Style.SelectedNode(colorIndex) : Style.SimpleNode(colorIndex);
@@ -95,7 +91,8 @@ namespace FirUtility
         public void DrawConnections()
         {
             Vector2 Vector2offset = new Vector2(5, 5);
-
+            Node connectionToRemove = null;
+            
             foreach (var connection in connections)
             {
                 float directionX = connection.position.x - position.x;
@@ -136,23 +133,36 @@ namespace FirUtility
                     4f
                 );
                 Handles.DrawAAConvexPolygon(arrowPosition, arrowLeft, arrowRight, endPosition);
+                
+                if (Handles.Button(
+                        (startPosition + endPosition) * 0.5f, 
+                        Quaternion.identity, 
+                        1.2f, 4, 
+                        Handles.RectangleHandleCap))
+                {
+                    connectionToRemove = connection;
+                }
             }
+
+            if (connectionToRemove is not null)
+                DisconnectNode(connectionToRemove);
         }
         
-        public bool ProcessEvents(Event e)
+        public bool ProcessEvents(Event e, bool isCanBeSelected)
         {
             switch (e.type)
             {
                 case EventType.MouseDown:
                     if (e.button == 0)
                     {
-                        if (rect.Contains(e.mousePosition))
+                        if (isCanBeSelected && rect.Contains(e.mousePosition))
                         {
                             isDragged = true;
                             isSelected = true;
                             GUI.changed = true;
+                            return true;
                         }
-                        else
+                        else if(isSelected)
                         {
                             isSelected = false;
                             GUI.changed = true;
@@ -181,6 +191,10 @@ namespace FirUtility
                         return true;
                     }
 
+                    break;
+                case EventType.KeyDown:
+                    if (e.keyCode == KeyCode.Delete && isSelected)
+                        OnRemoveNode?.Invoke(this);
                     break;
             }
 
