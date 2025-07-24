@@ -14,6 +14,7 @@ namespace FirUtility
         public const int MinButtonWidth = 60;
         public const int MinButtonHeight = 50;
         
+        public static string AssrmblyColor(string text = "Assembly") => $"<color=#DD00DD>{text}</color>";
         public static string PublicColor(string text = "public") => $"<color=#9CDCFE>{text}</color>";
         public static string PrivateColor(string text = "private") => $"<color=#569CD6>{text}</color>";
         public static string StaticColor(string text = "static") => $"<color=#007FFF>{text}</color>";

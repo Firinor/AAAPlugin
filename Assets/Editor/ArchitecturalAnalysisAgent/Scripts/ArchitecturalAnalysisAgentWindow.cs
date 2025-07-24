@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using JetBrains.Annotations;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEditorInternal;
@@ -21,6 +20,7 @@ namespace FirUtility
         
         //Right mode
         private string[] assemblyNames;
+        private AssemblyFilterMode assemblyFilterMode = AssemblyFilterMode.Assets;
         private bool assemblyGroup = true;
         private string selectedAssemblyString;
         private HashSet<string> scriptNames;
@@ -33,6 +33,12 @@ namespace FirUtility
         //Nodes
         private List<Node> nodes = new List<Node>();
         private Node newConnection;
+        
+        [MenuItem("FirUtility/Assets Scripts Analysis")]
+        public static void ShowScriptsAnalysis()
+        {
+            Analyzer.ShowAssetsScriptsInfo();
+        }
         
         [MenuItem("FirUtility/Architectural Analysis Agent")]
         public static void ShowWindow()
@@ -55,8 +61,19 @@ namespace FirUtility
         
         private void RefreshAssemblies()
         {
+            string locationKey = assemblyFilterMode switch
+            {
+                AssemblyFilterMode.Assets => "ScriptAssemblies",
+                AssemblyFilterMode.Unity => "Library",
+                AssemblyFilterMode.System => "",
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            assemblyNames = assemblies.Select(a => a.GetName().Name).ToArray();
+            assemblyNames = assemblies
+                .Where(a => a.Location.Contains(locationKey))
+                .Select(a => a.GetName().Name)
+                .ToArray();
 
             if (assemblies.Any(a => a.GetName().Name == "Assembly-CSharp"))
             {
@@ -173,16 +190,36 @@ namespace FirUtility
                     assemblyFilter = true;
                 });
             }
-            
+
+            string assemblyFilterModeString =  assemblyFilterMode switch
+                {
+                    AssemblyFilterMode.Assets => "Filter by Assets",
+                    AssemblyFilterMode.Unity => "Filter by Unity",
+                    AssemblyFilterMode.System => "No filter",
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+            if (GUILayout.Button( new GUIContent(assemblyFilterModeString), new GUIStyle(Style.Button()){fixedWidth = 120}))
+            {
+                assemblyFilterMode = (AssemblyFilterMode)(((int)assemblyFilterMode + 1) % 3);
+                RefreshAssemblies();
+            }
             string folderSymbol = assemblyGroup ? "d_Folder Icon" : "d_TextAsset Icon";
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))
             {
                 assemblyGroup = !assemblyGroup;
             }
-            if (!String.IsNullOrEmpty(selectedAssemblyString) &&
-                GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
+            if (!String.IsNullOrEmpty(selectedAssemblyString))
             {
-                Analyzer.ShowAssemblyInfo(selectedAssemblyString);
+                if(GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image), Style.Button()))
+                {
+                    Analyzer.ShowAssemblyInfo(selectedAssemblyString);
+                }
+                if (GUILayout.Button("▼", Style.Button()))
+                {
+                    Assembly assembly = null;
+                    Analyzer.GetAssemblyByName(out assembly, selectedAssemblyString);
+                    GenerateNodes(assembly);
+                }
             }
             EditorGUILayout.EndHorizontal();
             
@@ -608,6 +645,10 @@ namespace FirUtility
                 return;
             }
             GenerateNodes(type);
+        }
+
+        private void GenerateNodes(Assembly assembly)
+        {
         }
 
         private void GenerateNodes(Type type)

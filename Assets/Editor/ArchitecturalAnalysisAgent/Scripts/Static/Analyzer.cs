@@ -6,7 +6,6 @@ using System.Text;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Bindings;
 using Object = System.Object;
 
 namespace FirUtility
@@ -23,7 +22,6 @@ namespace FirUtility
         public static bool GetAssemblyByName(out Assembly assembly, string assemblyName)
         {
             assembly = null;
-            
             try
             {
                 assembly = AppDomain.CurrentDomain.GetAssemblies()
@@ -434,6 +432,11 @@ namespace FirUtility
 
                 return false;
             }
+        }
+        
+        public static void ShowAssetsScriptsInfo()
+        {
+            
         }
         public static void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
         {

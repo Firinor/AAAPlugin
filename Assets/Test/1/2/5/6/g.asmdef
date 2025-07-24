@@ -1,0 +1,18 @@
+{
+    "name": "g",
+    "rootNamespace": "",
+    "references": [
+        "GUID:560c50f304144f74caff5c2f734cafb6",
+        "GUID:143b44c3779203c4d832118614fc02ef",
+        "GUID:6737bef9de4e3554f912f7618d2d3eee"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

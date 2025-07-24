@@ -18,6 +18,8 @@ namespace FirUtility
         
         private void OnGUI()
         {
+            if(_assembly is null) return;
+            
             string assemblyPath = _assembly.Location;
             var types = _assembly.GetTypes();
             

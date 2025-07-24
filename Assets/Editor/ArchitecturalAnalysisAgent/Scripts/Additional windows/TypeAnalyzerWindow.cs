@@ -224,7 +224,12 @@ namespace FirUtility
         
         private void BuildInheritanceInfo(Type type)
         {
-            string result = $"{Analyzer.GetTypePrefix(type)}: {type}" +
+            string result = $"{Style.AssrmblyColor() + ": "}" +
+                            $"{type.Assembly.GetName().Name}" +
+                            $"{", version: " + type.Assembly.GetName().Version}" +
+                            $"{Environment.NewLine}" +
+                            $"{Environment.NewLine}" +
+                            $"{Analyzer.GetTypePrefix(type)}: {type}" +
                             $"{Environment.NewLine}" +
                             $"{Analyzer.GetTypePostfix(type)}";
             
