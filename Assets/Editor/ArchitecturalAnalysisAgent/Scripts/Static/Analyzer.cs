@@ -33,7 +33,86 @@ namespace FirUtility
                 return false;
             }
 
+            if(assembly is null) return false;
+            
             return true;
+        }
+
+        public static Assembly GetAssemblyByDefinition(AssemblyDefinitionAsset assemblyDefinitionAsset)
+        {
+            if(assemblyDefinitionAsset is null) return null;
+            
+            string json = assemblyDefinitionAsset.text;
+            AssemblyDefinition asmDef = JsonUtility.FromJson<AssemblyDefinition>(json);
+            string assemblyName = asmDef.name;
+            if (GetAssemblyByName(out Assembly assembly, assemblyName))
+                return assembly;
+            return null;
+        }
+        
+        public static Dictionary<Assembly, List<Assembly>> FindAssemblyReferences()
+        {
+            Dictionary<Assembly, List<Assembly>> result = new();
+            
+            var guids = AssetDatabase.FindAssets("t:AssemblyDefinitionAsset", new[] { "Assets" });
+            foreach (var guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                AssemblyDefinitionAsset assemblyDefinitionAsset
+                    = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(assetPath);
+                string json = assemblyDefinitionAsset.text;
+                AssemblyDefinition asmDef = JsonUtility.FromJson<AssemblyDefinition>(json);
+                Assembly mainAssembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
+                
+                if(asmDef.references is null || asmDef.references.Length < 1) continue;
+                
+                List<Assembly> dictionareValue = new();
+                foreach (string reference in asmDef.references)
+                {
+                    string asmDefPath = AssetDatabase.GUIDToAssetPath(reference);
+                    assemblyDefinitionAsset
+                        = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(asmDefPath);
+                    Assembly assembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
+                    if (assembly is not null)
+                        dictionareValue.Add(assembly);
+                }
+                if(dictionareValue.Count > 0)
+                    result.Add(mainAssembly, dictionareValue);
+            }
+
+            if(result.Count > 0)
+                return result;
+
+            return null;
+        }
+
+        public static List<Assembly> GetAssemblyByAssets(bool addDefaultAssembly = true)
+        {
+            List<Assembly> result = new();
+            Assembly assembly = null;
+            var guids = AssetDatabase.FindAssets("t:AssemblyDefinitionAsset", new[] { "Assets" });
+
+            foreach (var guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                AssemblyDefinitionAsset assemblyDefinitionAsset
+                    = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(assetPath);
+                assembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
+                if (assembly is not null)
+                    result.Add(assembly);
+            }
+
+            if (addDefaultAssembly)
+            {
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp")) result.Add(assembly);
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp-Editor")) result.Add(assembly);
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp-firstpass")) result.Add(assembly);
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp-Editor-firstpass")) result.Add(assembly);
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp-Test")) result.Add(assembly);
+                if (GetAssemblyByName(out assembly, "Assembly-CSharp-Editor-Tests")) result.Add(assembly);
+            }
+
+            return result;
         }
         
         public static bool GetTypeByName(out Type type, string typeName, Assembly assembly = null)
@@ -436,7 +515,10 @@ namespace FirUtility
         
         public static void ShowAssetsScriptsInfo()
         {
-            
+            var analysisInfoWindow = EditorWindow.CreateInstance<AssemblyAnalysisInfoWindow>();
+            analysisInfoWindow.SetAssembly(GetAssemblyByAssets());
+            analysisInfoWindow.titleContent = new GUIContent("Quick Project Analysis");
+            analysisInfoWindow.Show();
         }
         public static void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
         {

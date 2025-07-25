@@ -33,8 +33,9 @@ namespace FirUtility
         //Nodes
         private List<Node> nodes = new List<Node>();
         private Node newConnection;
+        private Dictionary<Assembly, List<Assembly>> assemblyReferences;
         
-        [MenuItem("FirUtility/Assets Scripts Analysis")]
+        [MenuItem("FirUtility/Quick Analysis", priority = 1)]
         public static void ShowScriptsAnalysis()
         {
             Analyzer.ShowAssetsScriptsInfo();
@@ -51,7 +52,8 @@ namespace FirUtility
             map = new NodeMapSettings(this);
             map.OnEditNode = OnEditNode;
             map.OnRemoveNode = OnRemoveNode;
-            map.OnAnalysisNode = GenerateNodes;
+            map.OnAnalysisNodeByType = GenerateNodes;
+            map.OnAnalysisNodeByAssembly = GenerateNodes;
             map.OnAddConnection = AddConnection;
             map.OnRemoveConnections = RemoveConnections;
             map.OnCopyNode = CopyClassNameToClipboard;
@@ -79,6 +81,8 @@ namespace FirUtility
             {
                 selectedAssemblyString = "Assembly-CSharp";
             }
+            
+            assemblyReferences = Analyzer.FindAssemblyReferences();
         }
         
         private void OnGUI()
@@ -139,11 +143,19 @@ namespace FirUtility
                     typeof(AssemblyDefinitionAsset), 
                     false) 
                 as AssemblyDefinitionAsset;
-            
-            if (selectedAssembly != null 
-                && GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),  Style.Button()))
+
+            if (selectedAssembly != null)
             {
-                Analyzer.ShowAssemblyInfo(selectedAssembly);
+                if (GUILayout.Button(new GUIContent(EditorGUIUtility.IconContent("d_Search Icon").image),
+                        Style.Button()))
+                {
+                    Analyzer.ShowAssemblyInfo(selectedAssembly);
+                }
+
+                if (GUILayout.Button("▼", Style.Button()))
+                {
+                    GenerateNodes(selectedAssembly);
+                }
             }
             EditorGUILayout.EndHorizontal();
             
@@ -216,9 +228,7 @@ namespace FirUtility
                 }
                 if (GUILayout.Button("▼", Style.Button()))
                 {
-                    Assembly assembly = null;
-                    Analyzer.GetAssemblyByName(out assembly, selectedAssemblyString);
-                    GenerateNodes(assembly);
+                    GenerateNodes(selectedAssemblyString);
                 }
             }
             EditorGUILayout.EndHorizontal();
@@ -647,21 +657,106 @@ namespace FirUtility
             GenerateNodes(type);
         }
 
+        private void GenerateNodes(string assemblyName)
+        {
+            if (Analyzer.GetAssemblyByName(out Assembly assembly, assemblyName))
+                GenerateNodes(assembly);
+            else
+            {
+                Debug.LogError("Couldn't find the assembly by name!");
+            }
+        }
+        private void GenerateNodes(AssemblyDefinitionAsset assemblyDefinitionAsset)
+        {
+            Assembly assembly = Analyzer.GetAssemblyByDefinition(assemblyDefinitionAsset);
+        }
+        private void GenerateNodes(AssemblyNode assembly)
+        {
+            
+        }
         private void GenerateNodes(Assembly assembly)
         {
+            if(assembly is null) return;
+            
+            Node lastCreatedNode;
+            AssemblyNode centerNode;
+
+            int xStep = map.xStep;
+            int nodeCount = 0;
+
+            ClearAllNodes();
+            ToStartPoint();
+
+            Center();
+            Right();
+            Left();
+            
+            void Center()//Itself
+            {
+                centerNode = new AssemblyNode(assembly, map, Vector2.zero);
+                nodes.Add(centerNode);
+                lastCreatedNode = centerNode;
+
+                xStep = Mathf.Max(xStep, centerNode.name.Length);
+            }
+            void Right()//Use GUIDs
+            {
+                if(!assemblyReferences.TryGetValue(assembly, out List<Assembly> assemblies))
+                    return;
+                
+                nodeCount = assemblies.Count;
+                xStep = CalculateXStep(assemblies);
+
+                int i = 0;
+                foreach (Assembly usingAssembly in assemblies)
+                {
+                    Node newNode = new AssemblyNode(usingAssembly, map, GetPosition(i, isRightSide: true, assemblies.Count, xStep));
+                    centerNode.ConnectNode(newNode);
+                    nodes.Add(newNode);
+                    i++;
+                }
+            }
+            void Left()//Who use this assembly
+            {
+                List<Assembly> foundAssemblies = new();
+
+                foreach (KeyValuePair<Assembly, List<Assembly>> reference in assemblyReferences)
+                {
+                    if(reference.Key == assembly) continue;
+                    
+                    if(reference.Value.Contains(assembly))
+                        foundAssemblies.Add(reference.Key);
+                }
+                
+                nodeCount = foundAssemblies.Count;
+                xStep = CalculateXStep(foundAssemblies);
+
+                int i = 0;
+                foreach (Assembly usingAssembly in foundAssemblies)
+                {
+                    Node newNode = new AssemblyNode(usingAssembly, map, GetPosition(i, isRightSide: false, foundAssemblies.Count, xStep));
+                    centerNode.ConnectNode(newNode);
+                    nodes.Add(newNode);
+                    i++;
+                }
+            }
         }
 
+        private void GenerateNodes(TypeNode typeNode)
+        {
+            if(typeNode is null || typeNode.type is null) return;
+            
+            GenerateNodes(typeNode.type);
+        }
         private void GenerateNodes(Type type)
         {
             if(type is null) return;
-            
+
             Node lastCreatedNode;
-            Node centerNode;
+            TypeNode centerNode;
             
-            int xStep = 50;
-            int yStep = 50;
+            int xStep = map.xStep;
             int nodeCount = 0;
-            int gap = 40;
             
             ClearAllNodes();
             ToStartPoint();
@@ -674,7 +769,7 @@ namespace FirUtility
             
             void Center()//Itself
             {
-                centerNode = new Node(type, map, Vector2.zero, Style.GetColorByType(type));
+                centerNode = new TypeNode(type, map, Vector2.zero, color: Style.GetColorByType(type));
                 nodes.Add(centerNode);
                 lastCreatedNode = centerNode;
 
@@ -688,14 +783,14 @@ namespace FirUtility
                 bool isInterfaces = interfaces != null && interfaces.Length > 0;
                 bool isParents = parent != null;
                 
-                Vector2 offset = new Vector2(0, -yStep);
+                Vector2 offset = new Vector2(0, -map.yStep);
                 Vector2 classOffset = new Vector2(isInterfaces ? -xStep : 0, 0);
                 
                 int index = 1;
                 while (parent != null)
                 {
-                    Node newNode = new Node(parent, map,
-                        classOffset + offset * index, Style.GetColorByType(parent));
+                    Node newNode = new TypeNode(parent, map,
+                        classOffset + offset * index, color: Style.GetColorByType(parent));
                     newNode.ConnectNode(lastCreatedNode);
                     nodes.Add(newNode);
 
@@ -705,11 +800,11 @@ namespace FirUtility
                 }
                 if (!isInterfaces) return;
                 
-                Vector2 interfaceOffset = new Vector2(isParents ? xStep : 0, -yStep * 1.5f);
+                Vector2 interfaceOffset = new Vector2(isParents ? xStep : 0, -map.yStep * 1.5f);
                 for(var i = 0; i < interfaces.Length; i++)
                 {
-                    Node newNode = new Node(interfaces[i], map,
-                        interfaceOffset + offset * i, Style.GetColorByType(interfaces[i]));
+                    Node newNode = new TypeNode(interfaces[i], map,
+                        interfaceOffset + offset * i, color: Style.GetColorByType(interfaces[i]));
                     newNode.ConnectNode(centerNode);
                     nodes.Add(newNode);
                 }
@@ -751,7 +846,7 @@ namespace FirUtility
                 int i = 0;
                 foreach (Attribute attribute in attributes)
                 {
-                    Node newNode = new Node("[Attribute " + attribute + "]", map, GetPosition(i, isRightSide: true),
+                    Node newNode = new Node("[Attribute " + attribute + "]", map, GetPosition(i, isRightSide: true, nodeCount, xStep),
                         NodeMapSettings.NodeColor.Teal);
                     centerNode.ConnectNode(newNode);
                     nodes.Add(newNode);
@@ -766,7 +861,7 @@ namespace FirUtility
                         continue;
                     names.Add(name);
                     
-                    Node newNode = new Node(usingType, map, GetPosition(i, isRightSide: true), Style.GetColorByType(usingType));
+                    Node newNode = new TypeNode(usingType, map, GetPosition(i, isRightSide: true, nodeCount, xStep), color: Style.GetColorByType(usingType));
                     centerNode.ConnectNode(newNode);
                     nodes.Add(newNode);
                     i++;
@@ -777,12 +872,12 @@ namespace FirUtility
                 var inheritors = Analyzer.GetAllInheritorOfType(type);
                 if(inheritors is null) return;
                 
-                Vector2 offset = new Vector2(0, yStep);
+                Vector2 offset = new Vector2(0, map.yStep);
                 int i = 1;
                 foreach (Type inheritor in inheritors)
                 {
-                    Node newNode = new Node(inheritor, map,
-                        offset * i, Style.GetColorByType(inheritor));
+                    Node newNode = new TypeNode(inheritor, map,
+                        offset * i, color: Style.GetColorByType(inheritor));
                     if(inheritor.BaseType == centerNode.type)
                         centerNode.ConnectNode(newNode);
                     
@@ -802,38 +897,47 @@ namespace FirUtility
                 int i = 0;
                 foreach (var userType in usersType)
                 {
-                    Node newNode = new Node(userType, map, GetPosition(i, isRightSide: false), Style.GetColorByType(userType));
+                    Node newNode = new TypeNode(userType, map, GetPosition(i, isRightSide: false, nodeCount, xStep), color: Style.GetColorByType(userType));
                     newNode.ConnectNode(centerNode);
                     nodes.Add(newNode);
                     i++;
                 }
             }
-            
-            Vector2 GetPosition(int i, bool isRightSide)
-            {
-                int columnCap = Math.Min(10, nodeCount);
-                if (columnCap == 0) columnCap = 1;
+        }
+        
+        private Vector2 GetPosition(int i, bool isRightSide, int nodeCount, int xStep)
+        {
+            int columnCap = Math.Min(10, nodeCount);
+            if (columnCap == 0) columnCap = 1;
                 
-                Vector2Int startPoint = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, yStep * -(columnCap-1)/2);
-                Vector2Int columnOffset = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, 0);
-                Vector2Int rowStep = new Vector2Int(0, yStep);
+            Vector2Int startPoint = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, map.yStep * -(columnCap-1)/2);
+            Vector2Int columnOffset = new Vector2Int((isRightSide? 1 : -1) * xStep * 4, 0);
+            Vector2Int rowStep = new Vector2Int(0, map.yStep);
 
-                return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));
-            }
+            return startPoint + (columnOffset * (int)(i / columnCap)) + (rowStep * (i % columnCap));
+        }
+        
+        private int CalculateXStep(HashSet<Type> usingTypes = null, HashSet<Attribute> attributes = null)
+        {
+            int maxTypeNameLength = 0;
+            int maxAttributeNameLength = 0;
+                
+            if (usingTypes is not null && usingTypes.Count > 0)
+                maxTypeNameLength = usingTypes.Max(_type => _type.ToString().Length);
+                
+            if(attributes is not null && attributes.Count > 0)
+                maxAttributeNameLength = attributes.Max(_attribute => _attribute.ToString().Length);
+                
+            return Mathf.Max(maxTypeNameLength + map.gap, maxAttributeNameLength + map.gap);
+        }
+        private int CalculateXStep(List<Assembly> usingAssemblies)
+        {
+            int maxNameLength = 0;
             
-            int CalculateXStep(HashSet<Type> usingTypes = null, HashSet<Attribute> attributes = null)
-            {
-                int maxTypeNameLength = 0;
-                int maxAttributeNameLength = 0;
+            if(usingAssemblies is not null && usingAssemblies.Count > 0)
+                maxNameLength = usingAssemblies.Max(_attribute => _attribute.ToString().Length);
                 
-                if (usingTypes is not null && usingTypes.Count > 0)
-                    maxTypeNameLength = usingTypes.Max(_type => _type.ToString().Length);
-                
-                if(attributes is not null && attributes.Count > 0)
-                    maxAttributeNameLength = attributes.Max(_attribute => _attribute.ToString().Length);
-                
-                return Mathf.Max(maxTypeNameLength + gap, maxAttributeNameLength + gap);
-            }
+            return maxNameLength + map.gap;
         }
 
         #endregion

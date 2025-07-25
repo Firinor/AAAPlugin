@@ -10,7 +10,6 @@ namespace FirUtility
     {
         public Vector2 position;
         public Rect rect;
-        public Type type;
         public string name;
         public int colorIndex = 1;
         
@@ -19,27 +18,10 @@ namespace FirUtility
 
         public HashSet<Node> connections = new HashSet<Node>();
 
-        private Action<Node> OnRemoveNode;
+        protected Action<Node> OnRemoveNode;
         
-        private NodeMapSettings map;
+        protected NodeMapSettings map;
 
-        public Node(Type type,
-            NodeMapSettings mapSettings,
-            Vector2 position,
-            NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Blue) 
-            
-            : this(type.ToString(), mapSettings, position, color)
-        {
-            this.type = type;
-            
-            if (String.IsNullOrEmpty(name))
-            {
-                if (!String.IsNullOrEmpty(type.FullName)) name = type.FullName;
-                else if (!String.IsNullOrEmpty(type.Name)) name = type.Name;
-                else if (!String.IsNullOrEmpty(type.UnderlyingSystemType.ToString())) name = type.UnderlyingSystemType.ToString();
-            }
-        }
-        
         public Node(string name,
             NodeMapSettings mapSettings,
             Vector2 position,
@@ -204,14 +186,10 @@ namespace FirUtility
             return false;
         }
 
-        private void ProcessContextMenu()
+        protected virtual void ProcessContextMenu()
         {
             GenericMenu genericMenu = new GenericMenu();
             
-            genericMenu.AddItem(new GUIContent("Open the information window"), false,
-                () => Analyzer.ShowScriptInfo(type));
-            genericMenu.AddItem(new GUIContent("Architectural analysis"), false, 
-                () => map.OnAnalysisNode?.Invoke(type));
             genericMenu.AddItem(new GUIContent("Add connection"), false, 
                 () => map.OnAddConnection?.Invoke(this));
             genericMenu.AddItem(new GUIContent("Remove connections"), false, 

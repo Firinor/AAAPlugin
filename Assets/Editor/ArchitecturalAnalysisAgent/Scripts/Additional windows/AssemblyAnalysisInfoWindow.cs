@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,42 +10,62 @@ namespace FirUtility
 {
     public class AssemblyAnalysisInfoWindow : EditorWindow
     {
-        private Assembly _assembly;
+        private List<Assembly> _assemblies;
         
         public void SetAssembly(Assembly assembly)
         { 
-            _assembly = assembly;
+            _assemblies = new(){assembly};
+        }
+        public void SetAssembly(List<Assembly> assemblies)
+        { 
+            _assemblies = assemblies;
         }
         
         private void OnGUI()
         {
-            if(_assembly is null) return;
+            if(_assemblies is null) return;
+
+            DateTime lastModified = DateTime.MinValue;
+            int namespacesCount = 0;
+            int staticClassCount = 0;
+            int monobehaviourCount = 0;
+            int classCount = 0;
+            int interfaceCount = 0;
+            int structCount = 0;
+            int enumCount = 0;
+
+            Type MonoBehaviourType = typeof(MonoBehaviour);
             
-            string assemblyPath = _assembly.Location;
-            var types = _assembly.GetTypes();
+            foreach (Assembly assembly in _assemblies)
+            {
+                string assemblyPath = assembly.Location;
+                var types = assembly.GetTypes();
+                DateTime modifiedDate = File.GetLastWriteTime(assemblyPath);
+                lastModified = lastModified > modifiedDate ? lastModified : modifiedDate;
+                namespacesCount += types
+                    .Select(t => t.Namespace)
+                    .Where(n => n != null)
+                    .Distinct()
+                    .Count();
+                staticClassCount += types.Count(t => t.IsClass && Analyzer.IsStaticClass(t));
+                monobehaviourCount += types.Count(t => t.IsClass && !Analyzer.IsStaticClass(t) && MonoBehaviourType.IsAssignableFrom(t));
+                classCount += types.Count(t => t.IsClass && !Analyzer.IsStaticClass(t) && !MonoBehaviourType.IsAssignableFrom(t));
+                interfaceCount += types.Count(t => t.IsInterface);
+                structCount += types.Count(t => t.IsValueType && !t.IsEnum);
+                enumCount += types.Count(t => t.IsEnum);
+            }
             
+            EditorGUILayout EditorGUILayout = new();
             EditorGUILayout.Space();
-            DateTime lastModified = File.GetLastWriteTime(assemblyPath);
-            GUILayout.Label("Last indexed: " + lastModified, EditorStyles.boldLabel);
-            var namespacesCount = types
-                .Select(t => t.Namespace)
-                .Where(n => n != null)
-                .Distinct()
-                .Count();
-            GUILayout.Label("Namespaces count: " + namespacesCount, EditorStyles.boldLabel);
-            
+            EditorGUILayout.Label("Last indexed: " + lastModified);
+            EditorGUILayout.Label("Namespaces count: " + namespacesCount);
             EditorGUILayout.Space();
-            int staticClassCount = types.Count(t => t.IsClass && Analyzer.IsStaticClass(t));
-            GUILayout.Label("Static classes count: " + staticClassCount, EditorStyles.boldLabel);
-            int classCount = types.Count(t => t.IsClass && !Analyzer.IsStaticClass(t));
-            GUILayout.Label("Non-static classes count: " + classCount, EditorStyles.boldLabel);
-            int interfaceCount = types.Count(t => t.IsInterface);
-            GUILayout.Label("Interfaces count: " + interfaceCount, EditorStyles.boldLabel);
-            int structCount = types.Count(t => t.IsValueType && !t.IsEnum);
-            GUILayout.Label("Structs count: " + structCount, EditorStyles.boldLabel);
-            int enumCount = types.Count(t => t.IsEnum);
-            GUILayout.Label("Enums count: " + enumCount, EditorStyles.boldLabel);
-           
+            EditorGUILayout.Label("Static classes count: " + staticClassCount);
+            EditorGUILayout.Label("MonoBehaviour classes count: " + monobehaviourCount);
+            EditorGUILayout.Label("Other classes count: " + classCount);
+            EditorGUILayout.Label("Interfaces count: " + interfaceCount);
+            EditorGUILayout.Label("Structs count: " + structCount);
+            EditorGUILayout.Label("Enums count: " + enumCount);
         }
     }
 }

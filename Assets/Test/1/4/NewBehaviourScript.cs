@@ -2,17 +2,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class NewBehaviourScript : MonoBehaviour
+public class NONOON
 {
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
+    private int i;
+}
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+public class NONOON2
+{
+    private int i;
 }

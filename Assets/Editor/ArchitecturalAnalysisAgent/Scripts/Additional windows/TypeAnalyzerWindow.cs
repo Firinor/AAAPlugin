@@ -12,7 +12,10 @@ namespace FirUtility
         private Type selectedType;
         private MonoScript selectedMonoScript;
 
+        private string assemblyInfo;
+        private string classInfo;
         private string inheritanceInfo;
+        private string interfacesInfo;
         
         private bool groupInfo = true;
         private bool privateInfo = true;
@@ -63,8 +66,9 @@ namespace FirUtility
             if (selectedType is null)
                 return;
             
+            EditorGUILayout EditorGUILayout = new();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-
+            
             HandleKeyboardEvents();
             HeaderSettings();
 
@@ -80,8 +84,10 @@ namespace FirUtility
             void HeaderSettings()
             {
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"<b>{inheritanceInfo}</b>", 
+                
+                EditorGUILayout.Label($"<b>{assemblyInfo}</b>", 
                     new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
+                
                 EditorGUILayout.LabelField(settingsStrig(), 
                     new GUIStyle(EditorStyles.wordWrappedLabel) { alignment = TextAnchor.MiddleRight });
 
@@ -110,11 +116,20 @@ namespace FirUtility
                     CopyClassNameToClipboard();
                 }
                 EditorGUILayout.EndHorizontal();
+                
+                EditorGUILayout.Label($"<b>{classInfo}</b>", 
+                    new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
+                if(!String.IsNullOrEmpty(inheritanceInfo))
+                    EditorGUILayout.Label($"<b>{inheritanceInfo}</b>", 
+                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
+                if(!String.IsNullOrEmpty(interfacesInfo))
+                    EditorGUILayout.Label($"<b>{interfacesInfo}</b>", 
+                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
             }
             void Fields()
             {
                 FieldInfo[] fields = selectedType.GetFields(flags);
-                EditorGUILayout.LabelField($"<b>Fields ({fields.Length}):</b>", 
+                EditorGUILayout.Label($"<b>Fields ({fields.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
                 if (fields != null)
@@ -125,7 +140,7 @@ namespace FirUtility
                             : field.IsFamily ? Style.PrivateColor("protected")
                             : Style.PrivateColor();
                         string staticModifier = field.IsStatic ? Style.StaticColor(" static") : "";
-                        EditorGUILayout.LabelField(
+                        EditorGUILayout.Label(
                             $"{accessModifier}{staticModifier} <color=#4EC9B0>{field.FieldType}</color> <color=#DCDCAA>{field.Name}</color>",
                             new GUIStyle(EditorStyles.label) { richText = true });
                     }
@@ -134,7 +149,7 @@ namespace FirUtility
             void Properties()
             {
                 PropertyInfo[] properties = selectedType.GetProperties(flags);
-                EditorGUILayout.LabelField($"<b>Properties ({properties.Length}):</b>", 
+                EditorGUILayout.Label($"<b>Properties ({properties.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
                 if (properties != null)
@@ -151,7 +166,7 @@ namespace FirUtility
                                 : Style.PrivateColor();
                         string staticModifier = (getter?.IsStatic ?? false) ? Style.StaticColor(" static") : "";
 
-                        EditorGUILayout.LabelField(
+                        EditorGUILayout.Label(
                             $"{accessModifier}{staticModifier} <color=#4EC9B0>{property.PropertyType.Name}</color> <color=#DCDCAA>{property.Name}</color>",
                             new GUIStyle(EditorStyles.label) { richText = true });
                     }
@@ -160,7 +175,7 @@ namespace FirUtility
             void Constructors()
             {
                 ConstructorInfo[] constructors = selectedType.GetConstructors(flags);
-                EditorGUILayout.LabelField($"<b>Constructors ({constructors.Length}):</b>", 
+                EditorGUILayout.Label($"<b>Constructors ({constructors.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
                 if (constructors != null)
@@ -177,14 +192,14 @@ namespace FirUtility
 
                         string text =
                             $"{accessModifier} <b>{constructor}</b>({paramsStr})";
-                        EditorGUILayout.LabelField(text, new GUIStyle(EditorStyles.label) { richText = true });
+                        EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
                     }
                 }
             }
             void Methods()
             {
                 MethodInfo[] methods = selectedType.GetMethods(flags);
-                EditorGUILayout.LabelField($"<b>Methods ({methods.Length}):</b>", 
+                EditorGUILayout.Label($"<b>Methods ({methods.Length}):</b>", 
                     new GUIStyle(EditorStyles.largeLabel) { richText = true });
                 
                 if (methods != null)
@@ -208,7 +223,7 @@ namespace FirUtility
 
                         string text =
                             $"{accessModifier}{staticModifier} {returnType} <b>{method.Name}{genericStr}</b>({paramsStr})";
-                        EditorGUILayout.LabelField(text, new GUIStyle(EditorStyles.label) { richText = true });
+                        EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
                     }
                 }
             }
@@ -224,45 +239,43 @@ namespace FirUtility
         
         private void BuildInheritanceInfo(Type type)
         {
-            string result = $"{Style.AssrmblyColor() + ": "}" +
-                            $"{type.Assembly.GetName().Name}" +
-                            $"{", version: " + type.Assembly.GetName().Version}" +
-                            $"{Environment.NewLine}" +
-                            $"{Environment.NewLine}" +
-                            $"{Analyzer.GetTypePrefix(type)}: {type}" +
-                            $"{Environment.NewLine}" +
-                            $"{Analyzer.GetTypePostfix(type)}";
+            assemblyInfo = $"{Style.AssemblyColor() + ": "}" +
+                           $"{type.Assembly.GetName().Name}" +
+                           $"{", version: " + type.Assembly.GetName().Version}";
             
-            result += Environment.NewLine;
+                       
+            classInfo =    $"{Analyzer.GetTypePrefix(type)}: {type}" +
+                           $"{Environment.NewLine}" +
+                           $"{Analyzer.GetTypePostfix(type)}";
+
+            inheritanceInfo = "";
             Type baseType = type.BaseType;
             if (baseType != null)
             {
-                result += Style.StaticColor("Inherits from: ");
+                inheritanceInfo += Style.StaticColor("Inherits from: ");
                 while (baseType != null)
                 {
-                    result += $"{baseType}";
+                    inheritanceInfo += $"{baseType}";
                     baseType = baseType.BaseType;
                     if (baseType != null)
                     {
-                        result += " → ";
+                        inheritanceInfo += " → ";
                     }
                 }
             }
-            
-            result += Environment.NewLine;
+
+            interfacesInfo = "";
             Type[] interfaces = type.GetInterfaces();
             if (interfaces.Length > 0)
             {
-                result += Style.StaticColor("Implements: ");
+                interfacesInfo += Style.StaticColor("Implements: ");
                 for (int i = 0; i < interfaces.Length; i++)
                 {
-                    result += interfaces[i].Name;
+                    interfacesInfo += interfaces[i].Name;
                     if (i < interfaces.Length - 1) 
-                        result += ", ";
+                        interfacesInfo += ", ";
                 }
             }
-            
-            inheritanceInfo = $"{result}";
         }
         
         //open code in editor

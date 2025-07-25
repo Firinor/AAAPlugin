@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -17,10 +18,15 @@ namespace FirUtility
         public float Zoom = 1;
         public Vector2 Offset;
         private EditorWindow window;
-
         
+        public int xStep = 50;
+        public int yStep = 50;
+        public int gap = 40;
+
         //Event bus
-        public Action<Type> OnAnalysisNode;
+        public Action<TypeNode> OnAnalysisNodeByType;
+        public Action<AssemblyNode> OnAnalysisNodeByAssembly;
+        
         public Action<Node> OnEditNode;
         public Action<string> OnCopyNode;
         public Action<Node> OnAddConnection;
