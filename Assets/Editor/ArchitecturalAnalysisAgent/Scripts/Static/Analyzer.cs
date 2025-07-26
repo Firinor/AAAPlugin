@@ -50,9 +50,9 @@ namespace FirUtility
             return null;
         }
         
-        public static Dictionary<Assembly, List<Assembly>> FindAssemblyReferences()
+        public static Dictionary<AssemblyBindData, List<AssemblyBindData>> FindAssemblyReferences()
         {
-            Dictionary<Assembly, List<Assembly>> result = new();
+            Dictionary<AssemblyBindData, List<AssemblyBindData>> result = new();
             
             var guids = AssetDatabase.FindAssets("t:AssemblyDefinitionAsset", new[] { "Assets" });
             foreach (var guid in guids)
@@ -63,21 +63,37 @@ namespace FirUtility
                 string json = assemblyDefinitionAsset.text;
                 AssemblyDefinition asmDef = JsonUtility.FromJson<AssemblyDefinition>(json);
                 Assembly mainAssembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
+
+                AssemblyBindData KeyData = new()
+                {
+                    Assembly = mainAssembly,
+                    AssemblyDefinitionAsset = assemblyDefinitionAsset
+                };
+                
+                List<AssemblyBindData> dictionaryValue = new();
+                result.Add(KeyData, dictionaryValue);
                 
                 if(asmDef.references is null || asmDef.references.Length < 1) continue;
                 
-                List<Assembly> dictionareValue = new();
                 foreach (string reference in asmDef.references)
                 {
-                    string asmDefPath = AssetDatabase.GUIDToAssetPath(reference);
+                    string referenceGuid = reference;
+                    if (reference.StartsWith("GUID:"))
+                        referenceGuid = reference.Substring(5);
+                    string asmDefPath = AssetDatabase.GUIDToAssetPath(referenceGuid);
                     assemblyDefinitionAsset
                         = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(asmDefPath);
                     Assembly assembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
                     if (assembly is not null)
-                        dictionareValue.Add(assembly);
+                    {
+                        AssemblyBindData ValueData = new()
+                        {
+                            Assembly = assembly,
+                            AssemblyDefinitionAsset = assemblyDefinitionAsset
+                        };
+                        dictionaryValue.Add(ValueData);
+                    }
                 }
-                if(dictionareValue.Count > 0)
-                    result.Add(mainAssembly, dictionareValue);
             }
 
             if(result.Count > 0)
@@ -522,7 +538,8 @@ namespace FirUtility
         }
         public static void ShowAssemblyInfo(AssemblyDefinitionAsset assemblyDefinitionAsset)
         {
-            ShowAssemblyInfo(assemblyDefinitionAsset?.name);
+            Assembly assembly = GetAssemblyByDefinition(assemblyDefinitionAsset);
+            ShowAssemblyInfo(assembly.GetName().Name);
         }
         public static void ShowAssemblyInfo(string assemblyName)
         {

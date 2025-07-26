@@ -11,16 +11,19 @@ namespace FirUtility
         public Assembly Assembly;
         public AssemblyDefinitionAsset AssemblyDefinitionAsset;
         
-        public AssemblyNode(Assembly assembly,
+        public AssemblyNode(AssemblyBindData assemblyData,
             NodeMapSettings mapSettings,
             Vector2 position,
-            AssemblyDefinitionAsset assemblyDefinitionAsset = null,
             NodeMapSettings.NodeColor color = NodeMapSettings.NodeColor.Grey) 
             
-            : base(assembly.GetName().Name, mapSettings, position, color)
+            : base(assemblyData.Assembly.GetName().Name, mapSettings, position, color)
         {
-            Assembly = assembly;
-            AssemblyDefinitionAsset = assemblyDefinitionAsset;
+            Assembly = assemblyData.Assembly;
+            AssemblyDefinitionAsset = assemblyData.AssemblyDefinitionAsset;
+            
+            if(AssemblyDefinitionAsset is not null 
+                && Assembly.GetName().Name != AssemblyDefinitionAsset.name)
+                name = Assembly.GetName().Name + " (" + AssemblyDefinitionAsset.name + ")";
         }
         
         protected override void ProcessContextMenu()
@@ -28,7 +31,7 @@ namespace FirUtility
             GenericMenu genericMenu = new GenericMenu();
             
             genericMenu.AddItem(new GUIContent("Open the information window"), false,
-                () => Analyzer.ShowAssemblyInfo(name));
+                () => Analyzer.ShowAssemblyInfo(Assembly.GetName().Name));
             genericMenu.AddItem(new GUIContent("Architectural analysis"), false, 
                 () => map.OnAnalysisNodeByAssembly?.Invoke(this));
             genericMenu.AddItem(new GUIContent("Add connection"), false, 

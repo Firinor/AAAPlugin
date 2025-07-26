@@ -33,7 +33,7 @@ namespace FirUtility
         //Nodes
         private List<Node> nodes = new List<Node>();
         private Node newConnection;
-        private Dictionary<Assembly, List<Assembly>> assemblyReferences;
+        private Dictionary<AssemblyBindData, List<AssemblyBindData>> assemblyReferences;
         
         [MenuItem("FirUtility/Quick Analysis", priority = 1)]
         public static void ShowScriptsAnalysis()
@@ -60,7 +60,7 @@ namespace FirUtility
             
             RefreshAssemblies();
         }
-        
+
         private void RefreshAssemblies()
         {
             string locationKey = assemblyFilterMode switch
@@ -81,8 +81,6 @@ namespace FirUtility
             {
                 selectedAssemblyString = "Assembly-CSharp";
             }
-            
-            assemblyReferences = Analyzer.FindAssemblyReferences();
         }
         
         private void OnGUI()
@@ -666,13 +664,14 @@ namespace FirUtility
                 Debug.LogError("Couldn't find the assembly by name!");
             }
         }
+        private void GenerateNodes(AssemblyNode assemblyNode)
+        {
+            GenerateNodes(assemblyNode.Assembly);
+        }
         private void GenerateNodes(AssemblyDefinitionAsset assemblyDefinitionAsset)
         {
             Assembly assembly = Analyzer.GetAssemblyByDefinition(assemblyDefinitionAsset);
-        }
-        private void GenerateNodes(AssemblyNode assembly)
-        {
-            
+            GenerateNodes(assembly);
         }
         private void GenerateNodes(Assembly assembly)
         {
@@ -686,6 +685,14 @@ namespace FirUtility
 
             ClearAllNodes();
             ToStartPoint();
+            
+            assemblyReferences = Analyzer.FindAssemblyReferences();
+
+            AssemblyBindData mainAssembly = assemblyReferences.Keys.FirstOrDefault(
+                key => key.Assembly == assembly);
+
+            if (mainAssembly is null)
+                mainAssembly = new(){Assembly = assembly};
 
             Center();
             Right();
@@ -693,7 +700,7 @@ namespace FirUtility
             
             void Center()//Itself
             {
-                centerNode = new AssemblyNode(assembly, map, Vector2.zero);
+                centerNode = new AssemblyNode(mainAssembly, map, Vector2.zero);
                 nodes.Add(centerNode);
                 lastCreatedNode = centerNode;
 
@@ -701,14 +708,14 @@ namespace FirUtility
             }
             void Right()//Use GUIDs
             {
-                if(!assemblyReferences.TryGetValue(assembly, out List<Assembly> assemblies))
+                if(!assemblyReferences.TryGetValue(mainAssembly, out List<AssemblyBindData> assemblies))
                     return;
                 
                 nodeCount = assemblies.Count;
                 xStep = CalculateXStep(assemblies);
 
                 int i = 0;
-                foreach (Assembly usingAssembly in assemblies)
+                foreach (AssemblyBindData usingAssembly in assemblies)
                 {
                     Node newNode = new AssemblyNode(usingAssembly, map, GetPosition(i, isRightSide: true, assemblies.Count, xStep));
                     centerNode.ConnectNode(newNode);
@@ -718,13 +725,15 @@ namespace FirUtility
             }
             void Left()//Who use this assembly
             {
-                List<Assembly> foundAssemblies = new();
+                List<AssemblyBindData> foundAssemblies = new();
 
-                foreach (KeyValuePair<Assembly, List<Assembly>> reference in assemblyReferences)
+                foreach (KeyValuePair<AssemblyBindData, List<AssemblyBindData>> reference in assemblyReferences)
                 {
-                    if(reference.Key == assembly) continue;
+                    if(reference.Key == mainAssembly
+                       || reference.Value is null
+                       || reference.Value.Count == 0) continue;
                     
-                    if(reference.Value.Contains(assembly))
+                    if(reference.Value.Contains(mainAssembly))
                         foundAssemblies.Add(reference.Key);
                 }
                 
@@ -732,10 +741,10 @@ namespace FirUtility
                 xStep = CalculateXStep(foundAssemblies);
 
                 int i = 0;
-                foreach (Assembly usingAssembly in foundAssemblies)
+                foreach (AssemblyBindData usingAssembly in foundAssemblies)
                 {
                     Node newNode = new AssemblyNode(usingAssembly, map, GetPosition(i, isRightSide: false, foundAssemblies.Count, xStep));
-                    centerNode.ConnectNode(newNode);
+                    newNode.ConnectNode(centerNode);
                     nodes.Add(newNode);
                     i++;
                 }
@@ -930,12 +939,12 @@ namespace FirUtility
                 
             return Mathf.Max(maxTypeNameLength + map.gap, maxAttributeNameLength + map.gap);
         }
-        private int CalculateXStep(List<Assembly> usingAssemblies)
+        private int CalculateXStep(List<AssemblyBindData> usingAssemblies)
         {
             int maxNameLength = 0;
             
             if(usingAssemblies is not null && usingAssemblies.Count > 0)
-                maxNameLength = usingAssemblies.Max(_attribute => _attribute.ToString().Length);
+                maxNameLength = usingAssemblies.Max(data => data.Assembly.GetName().Name.Length);
                 
             return maxNameLength + map.gap;
         }

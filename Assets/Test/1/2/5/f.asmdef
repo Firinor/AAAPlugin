@@ -1,3 +1,16 @@
 {
-	"name": "f"
+    "name": "f",
+    "rootNamespace": "",
+    "references": [
+        "GUID:6bbb57b49b89dbc47bf183f723e36cd9"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
