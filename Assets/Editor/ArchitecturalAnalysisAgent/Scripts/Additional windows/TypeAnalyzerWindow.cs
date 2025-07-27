@@ -121,10 +121,10 @@ namespace FirUtility
                     new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
                 if(!String.IsNullOrEmpty(inheritanceInfo))
                     EditorGUILayout.Label($"<b>{inheritanceInfo}</b>", 
-                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
+                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true }, false);
                 if(!String.IsNullOrEmpty(interfacesInfo))
                     EditorGUILayout.Label($"<b>{interfacesInfo}</b>", 
-                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true });
+                        new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true }, false);
             }
             void Fields()
             {
@@ -243,8 +243,7 @@ namespace FirUtility
                            $"{type.Assembly.GetName().Name}" +
                            $"{", version: " + type.Assembly.GetName().Version}";
             
-                       
-            classInfo =    $"{Analyzer.GetTypePrefix(type)}: {type}" +
+            classInfo =    $"{Analyzer.GetTypePrefix(type)}: {type} " +
                            $"{Environment.NewLine}" +
                            $"{Analyzer.GetTypePostfix(type)}";
 

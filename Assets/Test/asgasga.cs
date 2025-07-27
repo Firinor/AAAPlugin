@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class asgasga<T> : MonoBehaviour where T : Image, ICollection, IDisposable 
+public class asgasga<T, T2> : MonoBehaviour, IEnumerator where T : Image, ICollection, IDisposable where T2 : GUILayout
 {
 
     private int i;
@@ -43,6 +43,18 @@ public class asgasga<T> : MonoBehaviour where T : Image, ICollection, IDisposabl
     {
         throw new NotImplementedException();
     }
+
+    public bool MoveNext()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Reset()
+    {
+        throw new NotImplementedException();
+    }
+
+    public object Current { get; }
 }
 public interface asgasga22 
 {
