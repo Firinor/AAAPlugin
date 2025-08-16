@@ -70,12 +70,26 @@ namespace FirUtility
                 AssemblyFilterMode.System => "",
                 _ => throw new ArgumentOutOfRangeException()
             };
-            
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            assemblyNames = assemblies
-                .Where(a => a.Location.Contains(locationKey))
-                .Select(a => a.GetName().Name)
-                .ToArray();
+            List<Assembly> assembliesConstainsKey = new();
+            foreach (Assembly assembly in assemblies)
+            {
+                try
+                {
+                    if(assembly.Location.Contains(locationKey))
+                        assembliesConstainsKey.Add(assembly);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
+            List<string> assemblyNamesList = new();
+            foreach (var assembly in assembliesConstainsKey)
+            {
+                assemblyNamesList.Add(assembly.GetName().Name);
+            }
+            assemblyNames = assemblyNamesList.ToArray();
 
             if (assemblies.Any(a => a.GetName().Name == "Assembly-CSharp"))
             {
