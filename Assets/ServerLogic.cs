@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class ServerLogic : MonoBehaviour
 {
+    public List<int> fafa;
     // Start is called before the first frame update
     void Start()
     {

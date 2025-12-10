@@ -11,6 +11,7 @@ namespace FirUtility
         private static List<GUIStyle> nodeStyle;
         private static List<GUIStyle> selectedStyle;  
         private static GUIStyle buttonStyle;
+        private static GUIStyle foldoutStyle;
         
         public const int MinButtonWidth = 60;
         public const int MinButtonHeight = 50;
@@ -69,6 +70,19 @@ namespace FirUtility
 
             return selectedStyle[colorIndex];
         }
+        public static GUIStyle Foldout()
+        {
+            if (foldoutStyle == null)
+            {
+                foldoutStyle = new GUIStyle(EditorStyles.foldout)
+                {
+                    fixedWidth = 20,
+                    richText = true
+                };
+            }
+            return foldoutStyle;
+        }
+
         public static GUIStyle Button()
         {
             if (buttonStyle is null)
@@ -79,13 +93,14 @@ namespace FirUtility
                     padding = new RectOffset(),
                     alignment = TextAnchor.MiddleCenter,
                     fixedWidth = 20,
-                    fixedHeight = 20
+                    fixedHeight = 20,
+                    richText = true
                 };
             }
 
             return buttonStyle;
         }
-
+        
         public static NodeMapSettings.NodeColor GetColorByType(Type type)
         {
             if (type.IsEnum)

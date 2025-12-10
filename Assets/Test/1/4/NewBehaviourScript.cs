@@ -7,7 +7,7 @@ public class NONOON
     private int i;
 }
 
-public class NONOON2
+public static class NONOON2
 {
-    private int i;
+    private static int i;
 }

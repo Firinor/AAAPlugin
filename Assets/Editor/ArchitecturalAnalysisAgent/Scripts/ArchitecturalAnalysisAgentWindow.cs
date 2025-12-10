@@ -35,13 +35,13 @@ namespace FirUtility
         private Node newConnection;
         private Dictionary<AssemblyBindData, List<AssemblyBindData>> assemblyReferences;
         
-        [MenuItem("FirUtility/Quick Analysis", priority = 1)]
+        [MenuItem("Tools/FirUtility/Quick Analysis", priority = 1)]
         public static void ShowScriptsAnalysis()
         {
             Analyzer.ShowAssetsScriptsInfo();
         }
         
-        [MenuItem("FirUtility/Architectural Analysis Agent")]
+        [MenuItem("Tools/FirUtility/Architectural Analysis Agent")]
         public static void ShowWindow()
         {
             GetWindow<ArchitecturalAnalysisAgentWindow>("Architectural Analysis Agent");
@@ -58,45 +58,14 @@ namespace FirUtility
             map.OnRemoveConnections = RemoveConnections;
             map.OnCopyNode = CopyClassNameToClipboard;
             
-            RefreshAssemblies();
-        }
+            assemblyNames = Analyzer.GetAssembliesNames(assemblyFilterMode).ToArray();
 
-        private void RefreshAssemblies()
-        {
-            string locationKey = assemblyFilterMode switch
-            {
-                AssemblyFilterMode.Assets => "ScriptAssemblies",
-                AssemblyFilterMode.Unity => "Library",
-                AssemblyFilterMode.System => "",
-                _ => throw new ArgumentOutOfRangeException()
-            };
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            List<Assembly> assembliesConstainsKey = new();
-            foreach (Assembly assembly in assemblies)
-            {
-                try
-                {
-                    if(assembly.Location.Contains(locationKey))
-                        assembliesConstainsKey.Add(assembly);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
-            }
-            List<string> assemblyNamesList = new();
-            foreach (var assembly in assembliesConstainsKey)
-            {
-                assemblyNamesList.Add(assembly.GetName().Name);
-            }
-            assemblyNames = assemblyNamesList.ToArray();
-
-            if (assemblies.Any(a => a.GetName().Name == "Assembly-CSharp"))
+            if (assemblyNames.Any(a => a == "Assembly-CSharp"))
             {
                 selectedAssemblyString = "Assembly-CSharp";
             }
         }
-        
+
         private void OnGUI()
         {
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
@@ -225,7 +194,12 @@ namespace FirUtility
             if (GUILayout.Button( new GUIContent(assemblyFilterModeString), new GUIStyle(Style.Button()){fixedWidth = 120}))
             {
                 assemblyFilterMode = (AssemblyFilterMode)(((int)assemblyFilterMode + 1) % 3);
-                RefreshAssemblies();
+                
+                assemblyNames = Analyzer.GetAssembliesNames(assemblyFilterMode).ToArray();
+                if (assemblyNames.Any(a => a == "Assembly-CSharp"))
+                {
+                    selectedAssemblyString = "Assembly-CSharp";
+                }
             }
             string folderSymbol = assemblyGroup ? "d_Folder Icon" : "d_TextAsset Icon";
             if (GUILayout.Button( new GUIContent(EditorGUIUtility.IconContent(folderSymbol).image), Style.Button()))

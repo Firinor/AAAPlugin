@@ -12,6 +12,45 @@ namespace FirUtility
 {
     public static class Analyzer
     {
+        private static EditorGUILayout EditorGUILayout = new();
+        
+        public static List<Assembly> GetAssemblies(AssemblyFilterMode filterMode = AssemblyFilterMode.System)
+        {
+            string locationKey = filterMode switch
+            {
+                AssemblyFilterMode.Assets => "ScriptAssemblies",
+                AssemblyFilterMode.Unity => "Library",
+                AssemblyFilterMode.System => "",
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            List<Assembly> assembliesConstainsKey = new();
+            foreach (Assembly assembly in assemblies)
+            {
+                try
+                {
+                    if (assembly.Location.Contains(locationKey))
+                        assembliesConstainsKey.Add(assembly);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
+
+            return assembliesConstainsKey;
+        }
+
+        public static List<string> GetAssembliesNames(AssemblyFilterMode filterMode = AssemblyFilterMode.System)
+        {
+            List<string> assemblyNamesList = new();
+            foreach (var assembly in GetAssemblies(filterMode))
+            {
+                assemblyNamesList.Add(assembly.GetName().Name);
+            }
+            return assemblyNamesList;
+        }
+        
         public static bool GetTypeByName(out Type type, string typeName, string assemblyName)
         {
             GetAssemblyByName(out Assembly assembly, assemblyName);
@@ -199,6 +238,115 @@ namespace FirUtility
             return true;
         }
         
+        public static void Fields(Type selectedType, BindingFlags flags)
+        {
+            FieldInfo[] fields = selectedType.GetFields(flags);
+            if (fields != null && fields.Length > 0)
+            {
+                EditorGUILayout.Label($"<b>Fields ({fields.Length}):</b>", 
+                new GUIStyle(EditorStyles.largeLabel) { richText = true });
+            
+                foreach (FieldInfo field in fields)
+                {
+                    string accessModifier = field.IsPublic ? Style.PublicColor() 
+                        : field.IsFamily ? Style.PrivateColor("protected")
+                        : Style.PrivateColor();
+                    string staticModifier = field.IsStatic ? Style.StaticColor(" static") : "";
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.Label(
+                        $"{accessModifier}{staticModifier} <color=#4EC9B0>{field.FieldType}</color> <color=#DCDCAA>{field.Name}</color>",
+                        new GUIStyle(EditorStyles.label) { richText = true });
+                    EditorGUI.indentLevel--;
+                }
+            }
+        }
+        public static void Properties(Type selectedType, BindingFlags flags)
+        {
+            PropertyInfo[] properties = selectedType.GetProperties(flags);
+            if (properties != null && properties.Length > 0)
+            {
+                EditorGUILayout.Label($"<b>Properties ({properties.Length}):</b>", 
+                new GUIStyle(EditorStyles.largeLabel) { richText = true });
+            
+                foreach (PropertyInfo property in properties)
+                {
+                    MethodInfo getter = property.GetGetMethod(true);
+                    MethodInfo setter = property.GetSetMethod(true);
+
+                    string accessModifier = (getter?.IsPublic ?? false) || (setter?.IsPublic ?? false)
+                        ? Style.PublicColor()
+                        : (getter?.IsFamily ?? false) || (setter?.IsFamily ?? false) 
+                            ? Style.PrivateColor("protected") 
+                            : Style.PrivateColor();
+                    string staticModifier = (getter?.IsStatic ?? false) ? Style.StaticColor(" static") : "";
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.Label(
+                        $"{accessModifier}{staticModifier} <color=#4EC9B0>{property.PropertyType.Name}</color> <color=#DCDCAA>{property.Name}</color>",
+                        new GUIStyle(EditorStyles.label) { richText = true });
+                    EditorGUI.indentLevel--;
+                }
+            }
+        }
+        public static void Constructors(Type selectedType, BindingFlags flags)
+        {
+            ConstructorInfo[] constructors = selectedType.GetConstructors(flags);
+            if (constructors != null && constructors.Length > 0)
+            {
+                EditorGUILayout.Label($"<b>Constructors ({constructors.Length}):</b>", 
+                new GUIStyle(EditorStyles.largeLabel) { richText = true });
+            
+                foreach (ConstructorInfo constructor in constructors)
+                {
+                    string accessModifier = constructor.IsPublic ? Style.PublicColor() : 
+                        constructor.IsFamily ? Style.PrivateColor("protected") :  
+                        Style.PrivateColor();
+
+                    ParameterInfo[] parameters = constructor.GetParameters();
+                    string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
+                        $"<color=#4EC9B0>{parameterInfo.ParameterType.Name}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
+                    string text =
+                        $"{accessModifier} <b>{constructor}</b>({paramsStr})";
+                    
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
+                    EditorGUI.indentLevel--;
+                }
+            }
+        }
+        public static void Methods(Type selectedType, BindingFlags flags)
+        {
+            MethodInfo[] methods = selectedType.GetMethods(flags);
+            if (methods != null && methods.Length > 0)
+            {
+                EditorGUILayout.Label($"<b>Methods ({methods.Length}):</b>", 
+                new GUIStyle(EditorStyles.largeLabel) { richText = true });
+            
+                foreach (MethodInfo method in methods)
+                {
+                    string accessModifier = method.IsPublic ? Style.PublicColor() 
+                        : method.IsFamily ? Style.PrivateColor("protected")
+                        : Style.PrivateColor();
+                    string staticModifier = method.IsStatic ? Style.StaticColor(" static") : 
+                        method.IsAbstract ? Style.StaticColor(" abstract") : 
+                        (method.IsVirtual && (method.GetBaseDefinition() != method)) ? Style.StaticColor(" override") :
+                        method.IsVirtual ? Style.StaticColor(" virtual") :
+                        "";
+                    string returnType = $"<color=#4EC9B0>{method.ReturnType}</color>";
+
+                    string genericStr = Analyzer.GetMethodPostfix(method);
+                    ParameterInfo[] parameters = method.GetParameters();
+                    string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
+                        $"<color=#4EC9B0>{parameterInfo.ParameterType}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
+
+                    string text =
+                        $"{accessModifier}{staticModifier} {returnType} <b>{method.Name}{genericStr}</b>({paramsStr})";
+                    
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
+                    EditorGUI.indentLevel--;
+                }
+            }
+        }
         public static string GetTypePrefix(Type type)
         {
             return GetPublicity() + GetStatic() + " " + GetGetTypePrefix();

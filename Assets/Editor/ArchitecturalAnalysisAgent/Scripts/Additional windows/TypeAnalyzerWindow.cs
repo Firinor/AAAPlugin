@@ -74,10 +74,10 @@ namespace FirUtility
 
             BindingFlags flags = GetFlags();
             
-            Fields();
-            Properties();
-            Constructors();
-            Methods();
+            Analyzer.Fields(selectedType, flags);
+            Analyzer.Properties(selectedType, flags);
+            Analyzer.Constructors(selectedType, flags);
+            Analyzer.Methods(selectedType, flags);
 
             EditorGUILayout.EndScrollView();
 
@@ -126,107 +126,7 @@ namespace FirUtility
                     EditorGUILayout.Label($"<b>{interfacesInfo}</b>", 
                         new GUIStyle(EditorStyles.wordWrappedLabel) { richText = true }, false);
             }
-            void Fields()
-            {
-                FieldInfo[] fields = selectedType.GetFields(flags);
-                EditorGUILayout.Label($"<b>Fields ({fields.Length}):</b>", 
-                    new GUIStyle(EditorStyles.largeLabel) { richText = true });
-                
-                if (fields != null)
-                {
-                    foreach (FieldInfo field in fields)
-                    {
-                        string accessModifier = field.IsPublic ? Style.PublicColor() 
-                            : field.IsFamily ? Style.PrivateColor("protected")
-                            : Style.PrivateColor();
-                        string staticModifier = field.IsStatic ? Style.StaticColor(" static") : "";
-                        EditorGUILayout.Label(
-                            $"{accessModifier}{staticModifier} <color=#4EC9B0>{field.FieldType}</color> <color=#DCDCAA>{field.Name}</color>",
-                            new GUIStyle(EditorStyles.label) { richText = true });
-                    }
-                }
-            }
-            void Properties()
-            {
-                PropertyInfo[] properties = selectedType.GetProperties(flags);
-                EditorGUILayout.Label($"<b>Properties ({properties.Length}):</b>", 
-                    new GUIStyle(EditorStyles.largeLabel) { richText = true });
-                
-                if (properties != null)
-                {
-                    foreach (PropertyInfo property in properties)
-                    {
-                        MethodInfo getter = property.GetGetMethod(true);
-                        MethodInfo setter = property.GetSetMethod(true);
-
-                        string accessModifier = (getter?.IsPublic ?? false) || (setter?.IsPublic ?? false)
-                            ? Style.PublicColor()
-                            : (getter?.IsFamily ?? false) || (setter?.IsFamily ?? false) 
-                                ? Style.PrivateColor("protected") 
-                                : Style.PrivateColor();
-                        string staticModifier = (getter?.IsStatic ?? false) ? Style.StaticColor(" static") : "";
-
-                        EditorGUILayout.Label(
-                            $"{accessModifier}{staticModifier} <color=#4EC9B0>{property.PropertyType.Name}</color> <color=#DCDCAA>{property.Name}</color>",
-                            new GUIStyle(EditorStyles.label) { richText = true });
-                    }
-                }
-            }
-            void Constructors()
-            {
-                ConstructorInfo[] constructors = selectedType.GetConstructors(flags);
-                EditorGUILayout.Label($"<b>Constructors ({constructors.Length}):</b>", 
-                    new GUIStyle(EditorStyles.largeLabel) { richText = true });
-                
-                if (constructors != null)
-                {
-                    foreach (ConstructorInfo constructor in constructors)
-                    {
-                        string accessModifier = constructor.IsPublic ? Style.PublicColor() : 
-                            constructor.IsFamily ? Style.PrivateColor("protected") :  
-                            Style.PrivateColor();
-
-                        ParameterInfo[] parameters = constructor.GetParameters();
-                        string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
-                            $"<color=#4EC9B0>{parameterInfo.ParameterType.Name}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
-
-                        string text =
-                            $"{accessModifier} <b>{constructor}</b>({paramsStr})";
-                        EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
-                    }
-                }
-            }
-            void Methods()
-            {
-                MethodInfo[] methods = selectedType.GetMethods(flags);
-                EditorGUILayout.Label($"<b>Methods ({methods.Length}):</b>", 
-                    new GUIStyle(EditorStyles.largeLabel) { richText = true });
-                
-                if (methods != null)
-                {
-                    foreach (MethodInfo method in methods)
-                    {
-                        string accessModifier = method.IsPublic ? Style.PublicColor() 
-                            : method.IsFamily ? Style.PrivateColor("protected")
-                            : Style.PrivateColor();
-                        string staticModifier = method.IsStatic ? Style.StaticColor(" static") : 
-                            method.IsAbstract ? Style.StaticColor(" abstract") : 
-                            (method.IsVirtual && (method.GetBaseDefinition() != method)) ? Style.StaticColor(" override") :
-                            method.IsVirtual ? Style.StaticColor(" virtual") :
-                            "";
-                        string returnType = $"<color=#4EC9B0>{method.ReturnType}</color>";
-
-                        string genericStr = Analyzer.GetMethodPostfix(method);
-                        ParameterInfo[] parameters = method.GetParameters();
-                        string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
-                            $"<color=#4EC9B0>{parameterInfo.ParameterType}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
-
-                        string text =
-                            $"{accessModifier}{staticModifier} {returnType} <b>{method.Name}{genericStr}</b>({paramsStr})";
-                        EditorGUILayout.Label(text, new GUIStyle(EditorStyles.label) { richText = true });
-                    }
-                }
-            }
+            
             
             BindingFlags GetFlags()
             {

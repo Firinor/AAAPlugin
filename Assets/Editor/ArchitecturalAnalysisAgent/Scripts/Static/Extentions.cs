@@ -18,5 +18,16 @@ namespace FirUtility
             
             EditorGUILayout.SelectableLabel(text, style, options);
         }
+        
+        public static bool SelectableFoldout(this EditorGUILayout gui, bool foldout, string selectableText, GUIStyle style = null, bool toggleOnLabelClick = false)
+        {
+            EditorGUILayout.BeginHorizontal(GUILayout.ExpandWidth(false));
+            foldout = EditorGUILayout.Foldout(foldout, GUIContent.none, toggleOnLabelClick, Style.Foldout());
+            GUILayout.Space(-40);
+            Label(gui, selectableText, new GUIStyle(EditorStyles.boldLabel) { richText = true });
+            EditorGUILayout.EndHorizontal();
+
+            return foldout;
+        }
     }
 }
