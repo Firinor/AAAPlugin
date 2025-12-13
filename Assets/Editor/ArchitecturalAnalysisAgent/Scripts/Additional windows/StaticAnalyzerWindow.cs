@@ -18,9 +18,8 @@ namespace FirUtility
         private Vector2 scrollPosition;
         
         private readonly Dictionary<Assembly, List<Type>> types = new();
-        private readonly Dictionary<Assembly, List<Type>> typesUnity = new();
-        private readonly Dictionary<Assembly, List<Type>> typesSystem = new();
-        
+        private readonly Dictionary<Assembly, int> assemblyCount = new();
+        private readonly Dictionary<Type, int> typeCount = new();
         private readonly Dictionary<string, bool> assemblyFoldouts = new();
         private readonly Dictionary<string, bool> classFoldouts = new();
         
@@ -66,6 +65,7 @@ namespace FirUtility
                     return (prefix, typeName);
                 });
 
+                int assemblyInt = 0;
                 foreach (var type in orderedEnumerableType)
                 {
                     if(!CheckStatic(type))
@@ -81,7 +81,18 @@ namespace FirUtility
 
                     string typeName = type.FullName;
                     classFoldouts.TryAdd(typeName, false);
+
+                    int typeInt = 0;
+                    //if (type.IsValueType && type.IsEnum)
+                    //    typeInt = type.GetFields(flags).Length;
+                    //else
+                        typeInt = type.GetFields(flags).Length + type.GetProperties(flags).Length + type.GetMethods(flags).Length;
+                    assemblyInt += typeInt;
+                    
+                    typeCount.Add(type, typeInt);
                 }
+                
+                assemblyCount.Add(assembly, assemblyInt);
             }
         }
         
@@ -95,7 +106,7 @@ namespace FirUtility
                 
                 assemblyFoldouts[assemblyName] = EditorGUILayout.SelectableFoldout( 
                     assemblyFoldouts[assemblyName], 
-                    $"<b>{assemblyName}</b>",
+                    $"<b>{assemblyName} ({assemblyCount[assembly]})</b>",
                     Style.Foldout()
                 );
                 
@@ -109,14 +120,13 @@ namespace FirUtility
                         classFoldouts[typeName] = EditorGUILayout.SelectableFoldout(
                             classFoldouts[typeName],
                             $"{Analyzer.GetTypePrefix(type)}: {type.Name} {Analyzer.GetTypePostfix(type)} " 
-                            + (String.IsNullOrEmpty(type.Namespace) ? String.Empty 
-                                : $"({type.Namespace})"),
+                            + (String.IsNullOrEmpty(type.Namespace) ? String.Empty : $"namespace: {type.Namespace}")
+                            + $" ({typeCount[type]})",
                             Style.Foldout()
                         );
                         
                         if(classFoldouts[typeName])
                             CreateFoldout(type);
-                            
                     }
                     EditorGUI.indentLevel--;
                 }

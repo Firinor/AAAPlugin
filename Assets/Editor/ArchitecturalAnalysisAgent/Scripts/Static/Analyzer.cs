@@ -329,11 +329,10 @@ namespace FirUtility
                     string staticModifier = method.IsStatic ? Style.StaticColor(" static") : 
                         method.IsAbstract ? Style.StaticColor(" abstract") : 
                         (method.IsVirtual && (method.GetBaseDefinition() != method)) ? Style.StaticColor(" override") :
-                        method.IsVirtual ? Style.StaticColor(" virtual") :
-                        "";
+                        method.IsVirtual ? Style.StaticColor(" virtual") : "";
                     string returnType = $"<color=#4EC9B0>{method.ReturnType}</color>";
 
-                    string genericStr = Analyzer.GetMethodPostfix(method);
+                    string genericStr = GetMethodPostfix(method);
                     ParameterInfo[] parameters = method.GetParameters();
                     string paramsStr = string.Join(", ", parameters.Select(parameterInfo =>
                         $"<color=#4EC9B0>{parameterInfo.ParameterType}</color> <color=#9CDCFE>{parameterInfo.Name}</color>"));
